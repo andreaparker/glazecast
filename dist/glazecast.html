@@ -1,0 +1,3102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLAZECAST — predict the crystal</title>
+<style>
+  :root{
+    /* ground: kiln brick gone cold; ink: bone ash; accent: the kiln at 1000 °C */
+    --ground:#14120f; --ground-2:#1a1713; --ground-3:#211d18;
+    --rule:rgba(236,228,214,.11); --rule-2:rgba(236,228,214,.2); --rule-3:rgba(236,228,214,.34);
+    --ink:#ece4d6; --ink-2:#bcb2a3; --iron:#938a7e;
+    --amber:#d98a3d; --amber-ink:#e8a660; --teal:#76a99b; --oxblood:#c9735e;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --ease:cubic-bezier(.2,.7,.2,1);
+    --gutter:56px;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--ground)}
+  body{
+    margin:0;min-height:100vh;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums;position:relative;
+  }
+  /* grain + vignette: behind the content, never over the plate */
+  body::before,body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0}
+  body::before{
+    opacity:.055;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .93  0 0 0 0 .89  0 0 0 0 .84  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  body::after{
+    background:
+      radial-gradient(120% 80% at 82% -10%,rgba(217,138,61,.045),transparent 55%),
+      radial-gradient(140% 110% at 50% 30%,transparent 55%,rgba(6,5,4,.55));
+  }
+  ::selection{background:rgba(217,138,61,.32);color:var(--ink)}
+  :focus-visible{outline:1px solid var(--amber);outline-offset:3px}
+
+  .page{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:0 var(--gutter) 64px}
+
+  .label{
+    font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;
+    color:var(--iron);
+  }
+  .unit{font-family:var(--mono);font-weight:400;letter-spacing:0;text-transform:none;color:var(--iron)}
+  .mono{font-family:var(--mono)}
+
+  /* ---------------- masthead ---------------- */
+  .masthead{
+    display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:48px;align-items:end;
+    padding:30px 0 20px;border-bottom:1px solid var(--rule-2);
+  }
+  .mark{display:flex;align-items:flex-end;gap:12px;color:var(--ink)}
+  .mark svg{display:block;width:17px;height:30px;flex:none}
+  .wordmark{
+    font-family:var(--serif);font-size:22px;line-height:1;letter-spacing:.26em;font-weight:400;
+    text-transform:uppercase;margin:0 -.26em -1px 0;
+  }
+  .proposition{
+    margin:0;font-family:var(--serif);font-style:italic;font-size:16px;line-height:1.35;color:var(--ink-2);
+    max-width:56ch;
+  }
+  .status{margin:0;display:flex;align-items:center;gap:9px;white-space:nowrap}
+  .status .live{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+
+  /* ---------------- section labels ---------------- */
+  .sec-label{display:flex;align-items:baseline;gap:12px;margin:0 0 18px}
+  .sec-label .no{font-family:var(--serif);font-size:13px;letter-spacing:.04em;color:var(--amber-ink);font-weight:400;text-transform:none}
+
+  /* ---------------- stage: result + instrument ---------------- */
+  .stage{
+    display:grid;grid-template-columns:minmax(0,1fr) 340px;column-gap:72px;align-items:start;
+    padding-top:36px;
+  }
+
+  .plate{margin:0}
+  .plate-frame{position:relative;background:var(--ground-3);outline:1px solid var(--rule);outline-offset:9px}
+  .transport{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:14px;
+    padding:10px 14px 12px;border-top:1px solid var(--rule)}
+  .transport button{background:none;border:1px solid var(--rule-2);color:var(--ink);width:34px;height:26px;
+    border-radius:2px;cursor:pointer;font-size:11px;line-height:1;font-family:var(--sans)}
+  .transport button:hover{border-color:var(--amber);color:var(--amber-ink)}
+  .transport input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;background:transparent;cursor:pointer}
+  .transport input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--rule-2)}
+  .transport input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:9px;border-radius:50%;
+    background:var(--amber);margin-top:-3.5px;border:none}
+  .transport input[type=range]::-moz-range-track{height:2px;background:var(--rule-2)}
+  .transport input[type=range]::-moz-range-thumb{width:9px;height:9px;border-radius:50%;background:var(--amber);border:none}
+  .t-readout{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--iron);white-space:nowrap}
+  #surface{display:block;width:100%;height:clamp(380px,60vh,640px)}
+  .scale{
+    /* the plate is drawn at width / 24 px per mm, so 5 mm is 5/24 of its width */
+    position:absolute;left:18px;bottom:16px;width:calc(100% * 5 / 24);
+    font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:rgba(248,244,236,.82);
+    text-shadow:0 1px 3px rgba(10,8,6,.7);pointer-events:none;
+  }
+  .scale i{display:block;height:5px;border:1px solid rgba(248,244,236,.78);border-top:0;margin-bottom:5px;
+    box-shadow:0 1px 2px rgba(10,8,6,.5)}
+  .plate figcaption{
+    display:flex;justify-content:space-between;align-items:baseline;gap:24px;
+    margin-top:22px;font-size:12.5px;color:var(--ink-2);
+  }
+  .plate figcaption em{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink)}
+  .badge{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--iron);white-space:nowrap}
+
+  .verdict{margin-top:48px}
+  .verdict .label{display:block;margin-bottom:14px}
+  .verdict h1{
+    font-family:var(--serif);font-weight:400;font-size:clamp(30px,3vw,46px);line-height:1.07;
+    letter-spacing:-.012em;margin:0 0 30px;max-width:24ch;text-wrap:balance;
+  }
+  .verdict-body{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);column-gap:56px;align-items:start}
+  #v-detail{margin:0 0 20px;font-size:15px;line-height:1.62;color:var(--ink-2);max-width:54ch}
+  .conf{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11.5px;color:var(--iron)}
+  .conf b{color:var(--ink);font-weight:500}
+  .conf .pip{width:6px;height:6px;border-radius:50%;flex:none}
+
+  .facts{display:grid;grid-template-columns:1fr 1fr;column-gap:28px;margin:0}
+  .facts div{min-width:0;border-top:1px solid var(--rule);padding:9px 0 11px}
+  .facts div:nth-child(-n+2){border-top-color:var(--rule-3)}
+  .facts dt{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--iron);margin:0 0 3px}
+  .facts dd{margin:0;font-family:var(--mono);font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+  .swatch{display:inline-block;width:10px;height:10px;margin-right:8px;vertical-align:-1px;box-shadow:0 0 0 1px rgba(236,228,214,.3)}
+  small.u{font-size:.82em;color:var(--iron);font-weight:400}
+
+  .chain{
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:28px;margin:52px 0 0;
+    border-top:1px solid var(--rule-2);counter-reset:step;
+  }
+  .chain div{position:relative;padding:14px 0 0}
+  .chain div:not(:last-child)::after{
+    content:"→";position:absolute;right:-22px;top:12px;color:var(--iron);font-family:var(--serif);font-size:14px;
+  }
+  .chain dt{font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--iron);margin:0 0 7px}
+  .chain dt::before{counter-increment:step;content:counter(step,lower-roman) ".";font-family:var(--serif);
+    font-size:13px;letter-spacing:.02em;text-transform:none;font-weight:400;color:var(--amber-ink);margin-right:9px}
+  .chain dd{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.65;color:var(--ink-2)}
+
+  /* ---------------- instrument ---------------- */
+  .instrument{min-width:0}
+  .bench{padding:16px 0 30px;border-top:1px solid var(--rule-2)}
+  .bench + .bench{border-top-color:var(--rule)}
+  .bench h2{
+    margin:0 0 14px;display:flex;justify-content:space-between;align-items:baseline;
+    font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--iron);
+  }
+  .bench h2 .unit{font-size:10.5px}
+  .hint{margin:12px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink-2)}
+  .note{font-family:var(--serif);font-style:italic;font-size:14px;line-height:1.5;color:var(--ink-2)}
+
+  .chips{display:grid;grid-template-columns:1fr 1fr;column-gap:20px}
+  .chip{
+    display:grid;grid-template-columns:22px 1fr;align-items:baseline;text-align:left;
+    background:none;border:0;border-bottom:1px solid var(--rule);padding:8px 0 9px;margin:0;cursor:pointer;
+    color:var(--ink-2);font:inherit;font-size:13px;line-height:1.25;position:relative;
+    transition:color .18s ease,border-color .18s ease;
+  }
+  .chip .i{font-family:var(--mono);font-size:10px;color:var(--iron);grid-row:span 2}
+  .chip .nm{display:block}
+  .chip .k{display:block;font-family:var(--mono);font-size:10.5px;color:var(--iron);margin-top:2px;letter-spacing:.02em}
+  .chip::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;width:0;background:var(--ink-2);transition:width .3s var(--ease)}
+  .chip:hover{color:var(--ink)}
+  .chip:hover::after{width:100%}
+  .chip.on{color:var(--ink)}
+  .chip.on .i{color:var(--amber-ink)}
+  .chip.on::after{width:100%;background:var(--amber)}
+  #preset-blurb{margin-top:16px;min-height:4.5em}
+
+  /* inputs: a lab bench, not a form */
+  .instrument select,.instrument input[type=number]{
+    appearance:none;-webkit-appearance:none;-moz-appearance:textfield;
+    width:100%;background:transparent;border:0;border-radius:0;color:var(--ink);
+    font:13px/1.3 var(--sans);padding:7px 0 8px;margin:0;
+  }
+  .instrument select{
+    padding-right:18px;cursor:pointer;text-overflow:ellipsis;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='9' height='6'><path d='M.5.5 4.5 5 8.5.5' fill='none' stroke='%23938a7e'/></svg>");
+    background-repeat:no-repeat;background-position:right 2px center;
+  }
+  .instrument select option,.instrument select optgroup{background:var(--ground-2);color:var(--ink)}
+  .instrument input[type=number]{font-family:var(--mono);font-size:13px;text-align:right}
+  .instrument input::-webkit-outer-spin-button,.instrument input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .instrument select:focus,.instrument input:focus{outline:none}
+
+  .rows{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
+  .row{
+    display:grid;grid-template-columns:minmax(0,1fr) 64px 22px;column-gap:14px;align-items:center;
+    border-bottom:1px solid var(--rule);transition:border-color .18s ease;
+  }
+  .row:focus-within{border-bottom-color:var(--amber)}
+  .row .del{
+    background:none;border:0;padding:0;margin:0;cursor:pointer;color:var(--iron);font:15px/1 var(--sans);
+    opacity:.45;transition:opacity .15s ease,color .15s ease;height:26px;
+  }
+  .row:hover .del,.row .del:focus-visible{opacity:1}
+  .row .del:hover{color:var(--oxblood)}
+  .recipe-foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;gap:16px}
+  .add{
+    background:none;border:0;padding:0 0 2px;cursor:pointer;color:var(--ink-2);font:12.5px var(--sans);
+    background-image:linear-gradient(var(--amber),var(--amber));background-size:0 1px;background-repeat:no-repeat;
+    background-position:0 100%;transition:background-size .3s var(--ease),color .18s ease;
+  }
+  .add::before{content:"+";font-family:var(--mono);margin-right:7px;color:var(--amber-ink)}
+  .add:hover{color:var(--ink);background-size:100% 1px}
+  .total{display:flex;gap:16px;font-family:var(--mono);font-size:11.5px;color:var(--iron)}
+
+  .fields{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));column-gap:18px;row-gap:4px}
+  .field{grid-column:span 3;min-width:0}
+  .field.w6{grid-column:span 6}
+  .field.w2{grid-column:span 2}
+  .field label{display:flex;justify-content:space-between;font-size:10px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--iron);padding-top:8px}
+  .field label .unit{font-size:10.5px}
+  .field .ctl{border-bottom:1px solid var(--rule-2);transition:border-color .18s ease}
+  .field .ctl:focus-within{border-bottom-color:var(--amber)}
+  .bench .note{margin-top:18px}
+
+  /* ---------------- evidence ---------------- */
+  .evidence{margin-top:104px}
+  .evidence-head{
+    display:grid;grid-template-columns:200px minmax(0,1fr);column-gap:40px;align-items:end;
+    border-top:1px solid var(--rule-2);padding-top:16px;
+  }
+  .evidence-head .sec-label{margin:0 0 10px}
+  .tabs{display:flex;gap:40px;flex-wrap:wrap}
+  .tabs button{
+    background:none;border:0;margin:0;padding:0 0 10px;cursor:pointer;position:relative;
+    font-family:var(--serif);font-size:22px;line-height:1.2;color:var(--iron);transition:color .2s ease;
+  }
+  .tabs button .no{font-family:var(--mono);font-size:10px;letter-spacing:.04em;vertical-align:10px;margin-right:7px;color:var(--iron)}
+  .tabs button::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--amber);
+    transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+  .tabs button:hover{color:var(--ink-2)}
+  .tabs button.on{color:var(--ink)}
+  .tabs button.on .no{color:var(--amber-ink)}
+  .tabs button.on::after{transform:scaleX(1)}
+
+  .pane{display:none;padding:44px 0 0}
+  .pane.on{display:block;animation:fade .42s var(--ease) both}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .pane h3{
+    margin:0 0 4px;padding-bottom:10px;border-bottom:1px solid var(--rule-2);
+    font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--iron);
+  }
+  .pane h3:not(:first-child){margin-top:44px}
+  .pane .hint{max-width:62ch}
+  .hint b{color:var(--ink);font-weight:600}
+
+  .split{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(260px,1fr);column-gap:72px;align-items:start}
+  .split > div{min-width:0}
+  .cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:56px;margin-top:56px;align-items:start}
+  .cols > div{min-width:0}
+
+  /* ranked phases */
+  .ph{
+    display:grid;grid-template-columns:34px minmax(0,1fr) minmax(120px,190px) 150px;
+    grid-template-areas:"n main bar val";column-gap:22px;align-items:center;
+    padding:16px 0 15px;border-bottom:1px solid var(--rule);
+  }
+  .ph .n{grid-area:n;font-family:var(--mono);font-size:11px;color:var(--iron);align-self:baseline;padding-top:4px}
+  .ph .main{grid-area:main;min-width:0}
+  .ph .nm{font-family:var(--serif);font-size:18px;line-height:1.25;color:var(--ink)}
+  .ph .nm small{font-family:var(--mono);font-size:11.5px;color:var(--iron);margin-left:8px}
+  .ph .meta{color:var(--ink-2);font-size:12.5px;margin-top:3px}
+  .ph .bar{grid-area:bar;position:relative;height:1px;background:var(--rule-2)}
+  .ph .bar i{position:absolute;left:0;top:-1px;height:3px;background:var(--ink-2);opacity:.75}
+  .ph:first-child .bar i{background:var(--amber);opacity:1}
+  .ph .val{grid-area:val;text-align:right;font-family:var(--mono);font-size:11px;color:var(--iron);line-height:1.5}
+  .ph .val b{display:block;font-size:19px;font-weight:400;color:var(--ink);letter-spacing:-.01em}
+  .ph:first-child .val b{color:var(--amber-ink)}
+  .tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);margin-left:10px;vertical-align:1px}
+
+  /* redox ladder */
+  .lad{display:grid;grid-template-columns:40px minmax(0,1fr) 84px;column-gap:16px;align-items:center;
+    padding:10px 0 9px;border-bottom:1px solid var(--rule);font-size:12px}
+  .lad .el{font-family:var(--mono);color:var(--ink)}
+  .lad .track{position:relative;height:1px;background:var(--rule-2)}
+  .lad .track::after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:7px;background:var(--rule-3)}
+  .lad .track i{position:absolute;left:0;top:-1px;height:3px;background:var(--ink-2)}
+  .lad .pct{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);text-align:right;white-space:nowrap}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 0;border-bottom:1px solid var(--rule)}
+  th{color:var(--iron);font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;border-bottom-color:var(--rule-2)}
+  th + th,td + td{padding-left:16px}
+  td.num,th.num{text-align:right;font-family:var(--mono)}
+  td{color:var(--ink-2)}
+  td.num{font-size:12.5px}
+  td.k{color:var(--ink)}
+  .pane h3 + table{margin-top:-4px}
+
+  /* readouts */
+  .desc{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));column-gap:28px;margin:0}
+  .split .desc{grid-template-columns:1fr 1fr}
+  .desc div{border-bottom:1px solid var(--rule);padding:12px 0 13px;min-width:0}
+  .desc dt{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--iron);margin:0 0 5px}
+  .desc dd{margin:0;font-family:var(--mono);font-size:18px;line-height:1.25;color:var(--ink);overflow-wrap:anywhere;letter-spacing:-.01em}
+  .desc dd small{font-size:11.5px;color:var(--iron);margin-left:2px;letter-spacing:0}
+
+  .warn{padding:4px 0 4px 16px;margin:16px 0 0;border-left:1px solid var(--amber);font-size:13px;color:var(--ink-2);line-height:1.55}
+  .warn.high{border-left-color:var(--oxblood)}
+  .warn.info{border-left-color:var(--teal)}
+
+  .chart{margin-top:16px}
+  #ttt{display:block;width:100%;height:clamp(340px,46vh,440px)}
+  .legend{display:flex;gap:26px;flex-wrap:wrap;margin-top:14px;font-size:12px;color:var(--ink-2)}
+  .legend i{display:inline-block;width:18px;height:2px;vertical-align:4px;margin-right:8px}
+  .legend i.dash{background:repeating-linear-gradient(90deg,var(--ink) 0 4px,transparent 4px 7px) !important}
+  .legend .aside{color:var(--iron);font-family:var(--mono);font-size:11px}
+
+  /* levers */
+  .lever{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 84px;column-gap:24px;align-items:baseline;
+    padding:13px 0 12px 22px;border-bottom:1px solid var(--rule);position:relative}
+  .lever::before{content:"";position:absolute;left:0;top:22px;width:8px;height:1px;background:var(--rule-3)}
+  .lever .lbl{font-size:14px;color:var(--ink)}
+  .lever .res{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+  .lever .d{font-family:var(--mono);font-size:12.5px;color:var(--teal);text-align:right;white-space:nowrap}
+  .lever .d.neg{color:var(--oxblood)}
+  .lever.flip::before{width:12px;height:2px;top:21px;background:var(--amber)}
+  .lever.flip .res{color:var(--amber-ink)}
+  .key{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:12.5px;color:var(--ink-2)}
+  .key i{display:inline-block;width:12px;height:2px;background:var(--amber)}
+
+  /* ---------------- colophon ---------------- */
+  .colophon{
+    display:grid;grid-template-columns:200px minmax(0,1fr);column-gap:40px;
+    margin-top:112px;padding-top:16px;border-top:1px solid var(--rule-2);
+  }
+  .colophon p{margin:0;max-width:78ch;font-size:12.5px;line-height:1.7;color:var(--ink-2);columns:2 300px;column-gap:48px}
+  .colophon b{color:var(--ink);font-weight:600}
+  .colophon .sign{display:block;margin-top:28px;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink);column-span:all}
+
+  /* ---------------- load reveal ---------------- */
+  .reveal{animation:rise .8s var(--ease) both;animation-delay:var(--d,0s)}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .reveal,.pane.on{animation:none}
+    *{transition:none !important}
+  }
+
+  /* ---------------- narrower ---------------- */
+  @media (max-width:1180px){
+    :root{--gutter:40px}
+    .stage{grid-template-columns:1fr}
+    .instrument{margin-top:80px;display:grid;grid-template-columns:1fr 1fr;column-gap:48px}
+    .instrument > .sec-label{grid-column:1 / -1}
+    .instrument .bench:nth-of-type(1){grid-column:1 / -1}
+    .chips{grid-template-columns:repeat(4,minmax(0,1fr))}
+    #preset-blurb{min-height:0}
+    .bench + .bench{border-top-color:var(--rule-2)}
+    .split{grid-template-columns:1fr;row-gap:48px}
+    .cols{grid-template-columns:1fr 1fr}
+    .cols > div:last-child{grid-column:1 / -1}
+  }
+  @media (max-width:900px){
+    :root{--gutter:28px}
+    .masthead{grid-template-columns:1fr auto;row-gap:14px}
+    .proposition{grid-column:1 / -1;grid-row:2}
+    .verdict-body{grid-template-columns:1fr;row-gap:28px}
+    .evidence-head,.colophon{grid-template-columns:1fr;row-gap:12px}
+    .tabs{gap:28px}
+    .cols{grid-template-columns:1fr}
+    .ph{grid-template-columns:28px minmax(0,1fr) 120px;grid-template-areas:"n main val" ". bar bar";row-gap:12px}
+  }
+  @media (max-width:720px){
+    .instrument{grid-template-columns:1fr}
+    .chips{grid-template-columns:1fr 1fr}
+    .chain{grid-template-columns:1fr}
+    .chain div:not(:last-child)::after{content:none}
+    .lever{grid-template-columns:minmax(0,1fr) 70px}
+    .lever .res{grid-column:1;grid-row:2;margin-top:3px}
+    .lever .d{grid-row:1 / span 2;grid-column:2}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead reveal">
+    <div class="mark">
+      <!-- a pyrometric witness cone, tip bent at temperature -->
+      <svg viewBox="0 0 17 30" aria-hidden="true"><path d="M3.2 29.5 L6.6 9.2 Q7.6 3.4 13.6 1.6 Q9.8 5.6 10.1 11 L13.8 29.5 Z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M1 29.5 H16" stroke="#d98a3d" stroke-width="1"/></svg>
+      <span class="wordmark">Glazecast</span>
+    </div>
+    <p class="proposition">Enter a glaze recipe and its firing; read the crystal it will grow, with its system, habit, size and colour.</p>
+    <p class="status label"><a href="structures.html" style="color:inherit;border-bottom:1px solid rgba(217,138,61,.4);text-decoration:none">The unit cells ↗</a> &nbsp;·&nbsp; <span class="live"></span>Live · every edit recomputes</p>
+  </header>
+
+  <div class="stage">
+    <section class="result" aria-labelledby="v-headline">
+      <div class="sec-label label reveal" style="--d:.08s"><span class="no">I</span>Result</div>
+
+      <figure class="plate reveal" style="--d:.14s">
+        <div class="plate-frame">
+          <canvas id="surface"></canvas>
+          <div class="scale" aria-hidden="true"><i></i>5 mm</div>
+          <div class="transport">
+            <button id="t-play" aria-label="replay the firing">▶</button>
+            <input type="range" id="t-slider" min="0" max="1" step="0.001" value="1" aria-label="firing progress">
+            <span class="t-readout" id="t-readout">fired</span>
+          </div>
+        </div>
+        <figcaption>
+          <span><em>Fig. 1</em>&ensp;Predicted surface, 24 mm field of view</span>
+          <span class="badge" id="surface-badge">simulated</span>
+        </figcaption>
+      </figure>
+
+      <div class="verdict reveal" style="--d:.24s">
+        <span class="label">Predicted crystal</span>
+        <h1 id="v-headline">…</h1>
+        <div class="verdict-body">
+          <div>
+            <p id="v-detail"></p>
+            <div class="conf" id="v-conf"><span class="pip"></span><span>confidence <b>—</b></span></div>
+          </div>
+          <dl class="facts" id="v-facts"></dl>
+        </div>
+      </div>
+
+      <dl class="chain reveal" id="chain" style="--d:.32s"></dl>
+    </section>
+
+    <aside class="instrument reveal" aria-label="Instrument" style="--d:.18s">
+      <div class="sec-label label"><span class="no">II</span>Instrument</div>
+
+      <section class="bench">
+        <h2>Known outcomes <span class="unit">8 specimens</span></h2>
+        <div class="chips" id="presets"></div>
+        <p class="note" id="preset-blurb"></p>
+      </section>
+
+      <section class="bench">
+        <h2>Recipe <span class="unit">grams</span></h2>
+        <div class="rows" id="recipe-rows"></div>
+        <div class="recipe-foot">
+          <button class="add" id="add-row">Add material</button>
+          <span class="total"><span id="batch-total">—</span><span id="batch-loi">—</span></span>
+        </div>
+      </section>
+
+      <section class="bench">
+        <h2>Firing</h2>
+        <div class="fields">
+          <div class="field"><label for="f-cone">Cone</label><div class="ctl"><select id="f-cone"></select></div></div>
+          <div class="field"><label for="f-peak">Peak <span class="unit">°C</span></label><div class="ctl"><input type="number" id="f-peak" step="5"></div></div>
+          <div class="field w6"><label for="f-atm">Atmosphere</label><div class="ctl"><select id="f-atm"></select></div></div>
+          <div class="field w6"><label for="f-cool">Cooling</label><div class="ctl"><select id="f-cool">
+            <option value="fast">Fast — crash cool</option>
+            <option value="normal">Normal — kiln off</option>
+            <option value="slow">Slow — controlled</option>
+            <option value="vslow">Very slow — 12 h+</option>
+          </select></div></div>
+          <div class="field w2"><label for="f-holdc">Hold <span class="unit">°C</span></label><div class="ctl"><input type="number" id="f-holdc" step="10"></div></div>
+          <div class="field w2"><label for="f-holdm">Hold <span class="unit">min</span></label><div class="ctl"><input type="number" id="f-holdm" step="5"></div></div>
+          <div class="field w2"><label for="f-soak">Soak <span class="unit">min</span></label><div class="ctl"><input type="number" id="f-soak" step="5"></div></div>
+        </div>
+        <p class="note">The hold is where crystal growth happens. Drop it 80 °C and the same glaze frosts over; raise it and you get gloss.</p>
+      </section>
+    </aside>
+  </div>
+
+  <section class="evidence" aria-label="Evidence">
+    <div class="evidence-head">
+      <div class="sec-label label"><span class="no">III</span>Evidence</div>
+      <nav class="tabs" id="tabs">
+        <button data-tab="crystals" class="on"><span class="no">01</span>Crystals</button>
+        <button data-tab="kinetics"><span class="no">02</span>Kinetics</button>
+        <button data-tab="chemistry"><span class="no">03</span>Chemistry</button>
+        <button data-tab="levers"><span class="no">04</span>Levers</button>
+      </nav>
+    </div>
+
+    <section class="pane on" id="pane-crystals"></section>
+    <section class="pane" id="pane-kinetics"></section>
+    <section class="pane" id="pane-chemistry"></section>
+    <section class="pane" id="pane-levers"></section>
+  </section>
+
+  <footer class="colophon">
+    <div class="sec-label label"><span class="no">—</span>Method</div>
+    <p>
+      Recipes are reduced to oxide moles and a unity formula; multivalent cations are speciated against an atmosphere
+      ladder; each candidate phase gets a saturation ratio, a liquidus depression and a time–temperature–transformation
+      curve; the kiln schedule is integrated against those curves; crystals and dopants feed a Fresnel / ligand-field
+      colour model. Structures and habits are real crystallography. The kinetic constants are <b>calibrated</b>, not
+      first-principles: treat absolute times as ±half a decade, and read the ranking, the mechanisms and the levers as
+      the output.
+    </p>
+  </footer>
+</div>
+
+<script>
+/* GLAZECAST — core data: firing cones, oxide properties, raw materials.
+ * Classic script (no modules) so index.html works from file:// with no server.
+ */
+(function (root) {
+'use strict';
+var GC = root.GC = root.GC || {};
+
+/* ------------------------------------------------------------------ *
+ *  Orton self-supporting cone temperatures (approx, deg C)
+ * ------------------------------------------------------------------ */
+GC.CONES = {
+  '022': 600, '021': 614, '020': 635, '019': 683, '018': 717, '017': 747,
+  '016': 792, '015': 804, '014': 838, '013': 852, '012': 866, '011': 894,
+  '010': 903, '09': 923, '08': 955, '07': 984, '06': 999, '05': 1046,
+  '04': 1060, '03': 1086, '02': 1101, '01': 1117,
+  '1': 1154, '2': 1162, '3': 1170, '4': 1186, '5': 1196, '6': 1222,
+  '7': 1240, '8': 1255, '9': 1270, '10': 1305, '11': 1315, '12': 1325
+};
+
+/* ------------------------------------------------------------------ *
+ *  Oxides
+ *  mr      molar mass g/mol
+ *  O       oxygen atoms per formula unit  (for NBO/T)
+ *  T       tetrahedral network cations per formula unit
+ *  cat     cations: {el, n, z, r}  r = Shannon ionic radius (A)
+ *  role    former | intermediate | flux | colourant
+ *  lambda  optical basicity contribution (Duffy & Ingram, approx)
+ * ------------------------------------------------------------------ */
+GC.OXIDES = {
+  SiO2:  { label:'SiO2',  name:'silica',        mr:60.084,  O:2, T:1, role:'former',       lambda:0.48, cat:[{el:'Si',n:1,z:4,r:0.26}] },
+  Al2O3: { label:'Al2O3', name:'alumina',       mr:101.961, O:3, T:2, role:'intermediate', lambda:0.60, cat:[{el:'Al',n:2,z:3,r:0.39}] },
+  B2O3:  { label:'B2O3',  name:'boron oxide',   mr:69.620,  O:3, T:2, role:'former',       lambda:0.42, cat:[{el:'B',n:2,z:3,r:0.27}] },
+  P2O5:  { label:'P2O5',  name:'phosphorus',    mr:141.944, O:5, T:2, role:'former',       lambda:0.40, cat:[{el:'P',n:2,z:5,r:0.17}] },
+  Na2O:  { label:'Na2O',  name:'soda',          mr:61.979,  O:1, T:0, role:'flux',         lambda:1.15, cat:[{el:'Na',n:2,z:1,r:1.02}] },
+  K2O:   { label:'K2O',   name:'potash',        mr:94.196,  O:1, T:0, role:'flux',         lambda:1.40, cat:[{el:'K',n:2,z:1,r:1.38}] },
+  Li2O:  { label:'Li2O',  name:'lithia',        mr:29.881,  O:1, T:0, role:'flux',         lambda:1.00, cat:[{el:'Li',n:2,z:1,r:0.76}] },
+  CaO:   { label:'CaO',   name:'calcia',        mr:56.077,  O:1, T:0, role:'flux',         lambda:1.00, cat:[{el:'Ca',n:1,z:2,r:1.00}] },
+  MgO:   { label:'MgO',   name:'magnesia',      mr:40.304,  O:1, T:0, role:'flux',         lambda:0.78, cat:[{el:'Mg',n:1,z:2,r:0.72}] },
+  BaO:   { label:'BaO',   name:'baria',         mr:153.326, O:1, T:0, role:'flux',         lambda:1.22, cat:[{el:'Ba',n:1,z:2,r:1.35}] },
+  SrO:   { label:'SrO',   name:'strontia',      mr:103.619, O:1, T:0, role:'flux',         lambda:1.10, cat:[{el:'Sr',n:1,z:2,r:1.18}] },
+  ZnO:   { label:'ZnO',   name:'zinc oxide',    mr:81.379,  O:1, T:0, role:'flux',         lambda:0.95, cat:[{el:'Zn',n:1,z:2,r:0.74}] },
+  PbO:   { label:'PbO',   name:'lead oxide',    mr:223.200, O:1, T:0, role:'flux',         lambda:1.18, cat:[{el:'Pb',n:1,z:2,r:1.19}] },
+  Bi2O3: { label:'Bi2O3', name:'bismuth oxide', mr:465.959, O:3, T:0, role:'flux',         lambda:1.13, cat:[{el:'Bi',n:2,z:3,r:1.03}] },
+  Fe2O3: { label:'Fe2O3', name:'ferric oxide',  mr:159.688, O:3, T:0, role:'colourant',    lambda:0.72, cat:[{el:'Fe',n:2,z:3,r:0.65}] },
+  FeO:   { label:'FeO',   name:'ferrous oxide', mr:71.844,  O:1, T:0, role:'flux',         lambda:0.90, cat:[{el:'Fe',n:1,z:2,r:0.78}] },
+  TiO2:  { label:'TiO2',  name:'titania',       mr:79.866,  O:2, T:0, role:'intermediate', lambda:0.65, cat:[{el:'Ti',n:1,z:4,r:0.61}] },
+  ZrO2:  { label:'ZrO2',  name:'zirconia',      mr:123.223, O:2, T:0, role:'opacifier',    lambda:0.72, cat:[{el:'Zr',n:1,z:4,r:0.72}] },
+  SnO2:  { label:'SnO2',  name:'tin oxide',     mr:150.709, O:2, T:0, role:'opacifier',    lambda:0.60, cat:[{el:'Sn',n:1,z:4,r:0.69}] },
+  MnO:   { label:'MnO',   name:'manganese',     mr:70.937,  O:1, T:0, role:'colourant',    lambda:0.95, cat:[{el:'Mn',n:1,z:2,r:0.83}] },
+  CuO:   { label:'CuO',   name:'copper oxide',  mr:79.545,  O:1, T:0, role:'colourant',    lambda:0.90, cat:[{el:'Cu',n:1,z:2,r:0.73}] },
+  CoO:   { label:'CoO',   name:'cobalt oxide',  mr:74.933,  O:1, T:0, role:'colourant',    lambda:0.90, cat:[{el:'Co',n:1,z:2,r:0.75}] },
+  NiO:   { label:'NiO',   name:'nickel oxide',  mr:74.693,  O:1, T:0, role:'colourant',    lambda:0.90, cat:[{el:'Ni',n:1,z:2,r:0.69}] },
+  Cr2O3: { label:'Cr2O3', name:'chrome oxide',  mr:151.990, O:3, T:0, role:'colourant',    lambda:0.75, cat:[{el:'Cr',n:2,z:3,r:0.62}] },
+  V2O5:  { label:'V2O5',  name:'vanadia',       mr:181.880, O:5, T:0, role:'colourant',    lambda:0.78, cat:[{el:'V',n:2,z:5,r:0.54}] },
+  Sb2O3: { label:'Sb2O3', name:'antimony',      mr:291.518, O:3, T:0, role:'opacifier',    lambda:0.80, cat:[{el:'Sb',n:2,z:3,r:0.76}] },
+  CdO:   { label:'CdO',   name:'cadmium',       mr:128.410, O:1, T:0, role:'colourant',    lambda:1.05, cat:[{el:'Cd',n:1,z:2,r:0.95}] },
+  CeO2:  { label:'CeO2',  name:'ceria',         mr:172.115, O:2, T:0, role:'opacifier',    lambda:0.70, cat:[{el:'Ce',n:1,z:4,r:0.87}] },
+  Pr6O11:{ label:'Pr6O11',name:'praseodymia',   mr:1021.44, O:11,T:0, role:'colourant',    lambda:0.70, cat:[{el:'Pr',n:6,z:3.67,r:0.99}] },
+  Nd2O3: { label:'Nd2O3', name:'neodymia',      mr:336.482, O:3, T:0, role:'colourant',    lambda:0.70, cat:[{el:'Nd',n:2,z:3,r:0.98}] },
+  Er2O3: { label:'Er2O3', name:'erbia',         mr:382.561, O:3, T:0, role:'colourant',    lambda:0.70, cat:[{el:'Er',n:2,z:3,r:0.89}] },
+  WO3:   { label:'WO3',   name:'tungsten oxide',mr:231.838, O:3, T:0, role:'colourant',    lambda:0.80, cat:[{el:'W',n:1,z:6,r:0.60}] },
+  MoO3:  { label:'MoO3',  name:'molybdenum',    mr:143.938, O:3, T:0, role:'colourant',    lambda:0.80, cat:[{el:'Mo',n:1,z:6,r:0.59}] },
+  UO3:   { label:'UO3',   name:'uranium oxide', mr:286.027, O:3, T:0, role:'colourant',    lambda:0.85, cat:[{el:'U',n:1,z:6,r:0.73}] },
+  Ag2O:  { label:'Ag2O',  name:'silver oxide',  mr:231.735, O:1, T:0, role:'colourant',    lambda:1.00, cat:[{el:'Ag',n:2,z:1,r:1.15}] },
+  Au2O3: { label:'Au2O3', name:'gold oxide',    mr:441.931, O:3, T:0, role:'colourant',    lambda:1.00, cat:[{el:'Au',n:2,z:3,r:0.85}] }
+};
+
+GC.TM = ['Fe', 'Cu', 'Co', 'Mn', 'Cr', 'Ni', 'V', 'U', 'Pr', 'Nd', 'Er', 'Ce', 'W', 'Mo', 'Ag', 'Au', 'Bi', 'Sb', 'Sn', 'Ti', 'Cd'];
+
+/* ------------------------------------------------------------------ *
+ *  Raw materials.  analysis: [oxide, wt%].  LOI is tracked separately.
+ *  id keys are stable; UI shows `name`.
+ * ------------------------------------------------------------------ */
+function M(id, name, kind, analysis, loi, note) {
+  return { id: id, name: name, kind: kind, analysis: analysis, loi: loi || 0, note: note || '' };
+}
+
+GC.MATERIALS = [
+  /* --- glass formers / clay --- */
+  M('silica',      'Silica (325 mesh)',      'former', [['SiO2',99.5],['Al2O3',0.3],['Fe2O3',0.04]], 0.2),
+  M('quartz',      'Quartz flour',           'former', [['SiO2',98.5],['Al2O3',0.8],['Fe2O3',0.1]], 0.5),
+  M('kaolin',      'Kaolin (EPK)',           'clay',   [['SiO2',45.6],['Al2O3',37.4],['Fe2O3',0.6],['TiO2',0.1],['CaO',0.1],['MgO',0.1],['K2O',0.2],['Na2O',0.1]], 15.7),
+  M('ballclay',    'Ball clay (OM4)',        'clay',   [['SiO2',53.0],['Al2O3',30.0],['Fe2O3',1.0],['TiO2',1.2],['CaO',0.2],['MgO',0.3],['K2O',1.5],['Na2O',0.2]], 12.5),
+  M('bentonite',   'Bentonite',              'clay',   [['SiO2',60.0],['Al2O3',20.0],['Fe2O3',3.0],['MgO',2.0],['CaO',1.0],['Na2O',2.0],['K2O',1.0]], 10.0),
+  M('alumina',     'Alumina hydrate',        'former', [['Al2O3',65.4]], 34.6),
+  M('mullite',     'Mullite (calcined)',     'former', [['Al2O3',72.0],['SiO2',28.0]], 0),
+
+  /* --- feldspars / feldspathoids --- */
+  M('custer',      'Potash feldspar (Custer)', 'flux', [['SiO2',64.65],['Al2O3',18.30],['K2O',10.02],['Na2O',2.93],['CaO',0.20],['MgO',0.08],['Fe2O3',0.09],['TiO2',0.06]], 0.43),
+  M('sodafeld',    'Soda feldspar (NC-4)',   'flux',   [['SiO2',68.5],['Al2O3',19.0],['Na2O',10.5],['K2O',0.4],['CaO',0.4],['Fe2O3',0.1]], 0.3),
+  M('nepheline',   'Nepheline syenite (A-270)','flux', [['SiO2',60.0],['Al2O3',23.5],['Na2O',9.8],['K2O',4.5],['CaO',0.5],['Fe2O3',0.1]], 0.5),
+  M('spodumene',   'Spodumene',              'flux',   [['Li2O',7.5],['Al2O3',27.4],['SiO2',64.6],['Na2O',0.3],['Fe2O3',0.1]], 0.4),
+  M('petalite',    'Petalite',               'flux',   [['Li2O',4.9],['Al2O3',16.7],['SiO2',78.0],['Na2O',0.2]], 0.4),
+
+  /* --- alkaline earths --- */
+  M('whiting',     'Whiting',                'flux',   [['CaO',56.0]], 44.0),
+  M('wollastonite','Wollastonite',           'flux',   [['SiO2',51.7],['CaO',48.3]], 0),
+  M('dolomite',    'Dolomite',               'flux',   [['CaO',30.4],['MgO',21.7],['SiO2',0.2]], 47.7),
+  M('talc',        'Talc',                   'flux',   [['SiO2',63.5],['MgO',31.7],['CaO',0.2]], 4.6),
+  M('magnesite',   'Magnesium carbonate',    'flux',   [['MgO',47.8]], 52.2),
+  M('barium',      'Barium carbonate',       'flux',   [['BaO',77.7]], 22.3),
+  M('strontium',   'Strontium carbonate',    'flux',   [['SrO',70.2]], 29.8),
+  M('boneash',     'Bone ash',               'flux',   [['CaO',54.1],['P2O5',45.9]], 0),
+
+  /* --- zinc / lead / bismuth --- */
+  M('zinc',        'Zinc oxide',             'flux',   [['ZnO',100]], 0),
+  M('leadbisil',   'Lead bisilicate frit',   'flux',   [['PbO',65.0],['SiO2',33.0],['Al2O3',1.5],['B2O3',0.5]], 0),
+  M('bismuth',     'Bismuth trioxide',       'flux',   [['Bi2O3',100]], 0, 'Bi2O3. Melts 825 C. Strong flux at high loading; raises viscosity at low loading (Bi3+ field strength ~2.9 e/A).'),
+  M('bismuthsub',  'Bismuth subnitrate',     'flux',   [['Bi2O3',79.5]], 20.5, 'Historical luster salt: decomposes to Bi2O3, easily reduced to metal by CO.'),
+
+  /* --- boron --- */
+  M('frit3134',    'Borax frit (3134)',      'flux',   [['SiO2',46.9],['B2O3',22.6],['CaO',20.4],['Na2O',9.3],['K2O',0.3],['Al2O3',0.1],['Fe2O3',0.05]], 0),
+  M('gerstley',    'Gerstley borate',        'flux',   [['SiO2',22.0],['B2O3',21.0],['CaO',20.0],['Na2O',5.5],['MgO',2.0],['Al2O3',1.5],['Fe2O3',0.3]], 27.0),
+  M('boricacid',   'Boric acid',             'flux',   [['B2O3',56.3]], 43.7),
+  M('borax',       'Borax (decahydrate)',    'flux',   [['B2O3',36.5],['Na2O',16.3]], 47.2),
+
+  /* --- alkali --- */
+  M('sodaash',     'Soda ash',               'flux',   [['Na2O',58.5]], 41.5),
+  M('potash',      'Potassium carbonate',    'flux',   [['K2O',68.2]], 31.8),
+  M('lithium',     'Lithium carbonate',      'flux',   [['Li2O',40.4]], 59.6),
+
+  /* --- opacifiers / oxides --- */
+  M('tin',         'Tin oxide',              'opacifier', [['SnO2',100]], 0),
+  M('zircopax',    'Zircon (Zircopax)',      'opacifier', [['ZrO2',65.0],['SiO2',33.0],['Al2O3',1.0],['Fe2O3',0.1]], 0),
+  M('titania',     'Titanium dioxide',       'opacifier', [['TiO2',100]], 0),
+  M('rutile',      'Rutile (raw)',           'opacifier', [['TiO2',95.0],['Fe2O3',1.5],['SiO2',1.0],['Al2O3',1.0]], 0, 'Raw rutile: acid-washed residues seed rutile needles.'),
+  M('zirconia',    'Zirconium oxide',        'opacifier', [['ZrO2',99.0]], 0),
+  M('ceria',       'Cerium oxide',           'opacifier', [['CeO2',99.0]], 0),
+
+  /* --- colourants --- */
+  M('ironred',     'Red iron oxide',         'colourant', [['Fe2O3',99.0],['SiO2',0.5]], 0.5),
+  M('ironblack',   'Black iron oxide',       'colourant', [['Fe2O3',69.0],['FeO',31.0]], 0),
+  M('cobaltcarb',  'Cobalt carbonate',       'colourant', [['CoO',63.0]], 37.0),
+  M('cobaltox',    'Cobalt oxide',           'colourant', [['CoO',93.0]], 7.0),
+  M('coppercarb',  'Copper carbonate',       'colourant', [['CuO',71.9]], 28.1),
+  M('copperox',    'Copper oxide (black)',   'colourant', [['CuO',100]], 0),
+  M('manganese',   'Manganese dioxide',      'colourant', [['MnO',81.6]], 18.4),
+  M('mangancarb',  'Manganese carbonate',    'colourant', [['MnO',61.7]], 38.3),
+  M('chrome',      'Chrome oxide',           'colourant', [['Cr2O3',99.0]], 1.0),
+  M('nickel',      'Nickel oxide',           'colourant', [['NiO',99.0]], 1.0),
+  M('vanadium',    'Vanadium pentoxide',     'colourant', [['V2O5',99.0]], 1.0),
+  M('antimony',    'Antimony oxide',         'colourant', [['Sb2O3',99.0]], 1.0),
+  M('silver',      'Silver oxide',           'colourant', [['Ag2O',99.0]], 1.0),
+  M('praseo',      'Praseodymium oxide',     'colourant', [['Pr6O11',99.0]], 1.0),
+  M('neodym',      'Neodymium oxide',        'colourant', [['Nd2O3',99.0]], 1.0),
+  M('erbia',       'Erbium oxide',           'colourant', [['Er2O3',99.0]], 1.0),
+  M('tungsten',    'Tungsten oxide',         'colourant', [['WO3',99.0]], 1.0),
+  M('moly',        'Molybdenum oxide',       'colourant', [['MoO3',99.0]], 1.0),
+
+  /* --- redox / special --- */
+  M('sic',         'Silicon carbide',        'special', [['SiO2',2.0],['SiC',98.0]], 0, 'Consumes oxygen locally: the standard crystalline-glaze reduction trigger.'),
+  M('tin_metal',   'Tin metal powder',       'special', [['SnO2',100]], 0, 'Sacrificial oxygen getter in reduction glazes.')
+];
+
+GC.MATERIAL_BY_ID = {};
+GC.MATERIALS.forEach(function (m) { GC.MATERIAL_BY_ID[m.id] = m; });
+
+/* ------------------------------------------------------------------ *
+ *  Atmosphere presets -> effective "reduction strength" 0..1
+ * ------------------------------------------------------------------ */
+GC.ATMOSPHERES = [
+  { id:'ox',   name:'Oxidation (clean air)',    strength:0.00, note:'pO2 ~ 0.21 atm; Fe stays Fe3+, Cu stays Cu2+, Bi stays Bi3+.' },
+  { id:'neu',  name:'Neutral / light reduction',strength:0.28, note:'slightly starved air; Fe3+/Fe2+ boundary.' },
+  { id:'red',  name:'Reduction (gas kiln)',     strength:0.58, note:'CO present; Fe2+ stable, Cu+ -> Cu0 begins, Bi3+ -> Bi0 begins.' },
+  { id:'hred', name:'Heavy reduction',          strength:0.82, note:'strong CO/HC; Cu metal, Bi metal, Fe2+ dominant, Mn3+ -> Mn2+.' },
+  { id:'wood', name:'Wood / soda (local redox)',strength:0.66, note:'fluctuating local reduction, strongest at the flame face.' }
+];
+
+/* cones for UI */
+GC.CONE_LIST = ['06','05','04','03','02','01','1','2','3','4','5','6','7','8','9','10','11','12'];
+
+GC.util = {
+  clamp: function (x, a, b) { return x < a ? a : x > b ? b : x; },
+  lerp: function (a, b, t) { return a + (b - a) * t; },
+  sum: function (arr) { return arr.reduce(function (s, x) { return s + x; }, 0); },
+  round: function (x, d) { var p = Math.pow(10, d); return Math.round(x * p) / p; }
+};
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* GLAZECAST — crystalline phase database.
+ * Thermo values are approximate literature figures, rounded; they set the
+ * scale of the driving force and the TTT nose, not a precision phase diagram.
+ */
+(function (root) {
+'use strict';
+var GC = root.GC = root.GC || {};
+
+function P(o) { return o; }
+
+GC.PHASES = [
+  /* ---------------- zinc silicates: the crystalline-glaze family ------------- */
+  P({ id:'willemite', name:'Willemite', formula:'Zn2SiO4', kind:'silicate',
+      req:{ ZnO:2, SiO2:1 }, Tm:1785, dHf:70000, Vm:55, n:1.72,
+      system:'trigonal', sg:'R-3', shape:'spherulite',
+      habit:'prismatic to acicular, radiating spherulites and bow-ties',
+      color:'colourless', gloss:'glassy', nucleo:1.5, surface:0.8,
+      note:'The classic crystalline-glaze phase. Needs ZnO unity roughly >0.25 and a slow pass through 1050-1150 C. Nucleates heterogeneously at the glaze/air interface, then grows inward as radiating fans.' }),
+
+  P({ id:'zincite', name:'Zincite', formula:'ZnO', kind:'oxide',
+      req:{ ZnO:1 }, Tm:2248, dHf:55000, Vm:14.5, n:2.0,
+      system:'hexagonal', sg:'P63mc', shape:'needle',
+      habit:'acicular needles and hexagonal prisms',
+      color:'white', gloss:'adamantine', nucleo:1.2, surface:0.5,
+      note:'Forms only in heavily zinced, silica-poor melts; usually willemite wins because it is the more stable sink for Zn.' }),
+
+  P({ id:'gahnite', name:'Gahnite', formula:'ZnAl2O4', kind:'oxide',
+      req:{ ZnO:1, Al2O3:1 }, Tm:2223, dHf:100000, Vm:55, n:1.79,
+      system:'cubic', sg:'Fd-3m', shape:'octahedron',
+      habit:'octahedra, sometimes hopper-faced',
+      color:'colourless', gloss:'glassy', nucleo:0.9, surface:0.3,
+      note:'Zn-Al spinel. Takes Co and Cr into the tetrahedral site and turns them into stable ceramic pigments.' }),
+
+  /* ---------------- iron: tenmoku, oil spot, iron saturate ------------------- */
+  P({ id:'hematite', name:'Hematite', formula:'Fe2O3', kind:'oxide',
+      req:{ Fe2O3:1 }, Tm:1838, dHf:80000, Vm:30.4, n:3.0,
+      system:'trigonal', sg:'R-3c', shape:'tabular',
+      habit:'tabular rhombohedra, rosettes, specular platelets',
+      color:'red-brown', gloss:'metallic', nucleo:1.2, surface:1.0,
+      needs:{ species:'Fe3+', min:0.25 },
+      note:'Exsolves in the last 50-80 C of cooling in oxidised iron glazes. At the surface the platelets lie flat and give the specular "oil spot" sheen.' }),
+
+  P({ id:'magnetite', name:'Magnetite', formula:'Fe3O4', kind:'oxide',
+      req:{ Fe2O3:0.5, FeO:0.5 }, Tm:1870, dHf:90000, Vm:44.5, n:2.42,
+      system:'cubic', sg:'Fd-3m', shape:'octahedron',
+      habit:'octahedra and dendritic skeletons',
+      color:'black', gloss:'metallic', nucleo:1.1, surface:0.6,
+      needs:{ species:'Fe2+', min:0.35 },
+      note:'The black, slightly magnetic iron phase of reduction firings. Grows fast because Fe2+ diffuses easily in the reduced melt.' }),
+
+  P({ id:'zincferrite', name:'Zinc ferrite', formula:'ZnFe2O4', kind:'oxide',
+      req:{ ZnO:1, Fe2O3:1 }, Tm:1900, dHf:95000, Vm:44.0, n:2.1,
+      system:'cubic', sg:'Fd-3m', shape:'octahedron',
+      habit:'octahedra',
+      color:'dark brown', gloss:'dull', nucleo:1.0, surface:0.2,
+      note:'Competes with willemite for Zn when iron is high; kills the crystalline glaze effect.' }),
+
+  /* ---------------- titanium ------------------------------------------------- */
+  P({ id:'rutile', name:'Rutile', formula:'TiO2', kind:'oxide',
+      req:{ TiO2:1 }, Tm:2116, dHf:65000, Vm:18.8, n:2.7,
+      system:'tetragonal', sg:'P42/mnm', shape:'needle',
+      habit:'acicular needles, hair-like crystals, star twins',
+      color:'cream-white', gloss:'adamantine', nucleo:1.7, surface:0.7,
+      note:'Raw rutile never fully dissolves at cone 6 (liquidus ~1420 C), so it seeds itself: needles grow on the undissolved grains. That is why rutile is so much more "reactive" than TiO2.' }),
+
+  P({ id:'anatase', name:'Anatase', formula:'TiO2', kind:'oxide',
+      req:{ TiO2:1 }, Tm:1900, dHf:60000, Vm:20.1, n:2.5,
+      system:'tetragonal', sg:'I41/amd', shape:'octahedron',
+      habit:'bipyramidal microcrystals',
+      color:'white', gloss:'dull', nucleo:0.8, surface:0.2,
+      note:'Low-temperature polymorph; converts to rutile above ~800 C, so it survives only in low-fire or fast-cooled work.' }),
+
+  /* ---------------- tin / zirconium: opacifiers ----------------------------- */
+  P({ id:'cassiterite', name:'Cassiterite', formula:'SnO2', kind:'oxide',
+      req:{ SnO2:1 }, Tm:1903, dHf:55000, Vm:21.6, n:2.0,
+      system:'tetragonal', sg:'P42/mnm', shape:'octahedron',
+      habit:'prismatic to dipyramidal, twinned',
+      color:'white', gloss:'adamantine', nucleo:1.3, surface:0.4,
+      note:'Tin opacifier. With 0.2-0.5% Cr and Ca it becomes the chrome-tin pink pigment: Cr3+ in the cassiterite lattice.' }),
+
+  P({ id:'zircon', name:'Zircon', formula:'ZrSiO4', kind:'silicate',
+      req:{ ZrO2:1, SiO2:1 }, Tm:1949, dHf:90000, Vm:39.2, n:1.95,
+      system:'tetragonal', sg:'I41/amd', shape:'octahedron',
+      habit:'dipyramidal microcrystals',
+      color:'white', gloss:'dull', nucleo:1.0, surface:0.3,
+      note:'Very refractory: below ~1500 C it simply stays as undissolved opacifier particles. It does not really crystallise out of the melt.' }),
+
+  P({ id:'baddeleyite', name:'Baddeleyite', formula:'ZrO2', kind:'oxide',
+      req:{ ZrO2:1 }, Tm:2988, dHf:87000, Vm:21.2, n:2.2,
+      system:'monoclinic', sg:'P21/c', shape:'blade',
+      habit:'bladed, curved',
+      color:'white', gloss:'dull', nucleo:0.6, surface:0.2,
+      note:'Zirconia without enough silica to make zircon. Refractory; mostly stays undissolved.' }),
+
+  /* ---------------- alumina / silica / clays -------------------------------- */
+  P({ id:'corundum', name:'Corundum', formula:'Al2O3', kind:'oxide',
+      req:{ Al2O3:1 }, Tm:2345, dHf:110000, Vm:25.6, n:1.77,
+      system:'trigonal', sg:'R-3c', shape:'tabular',
+      habit:'tabular hexagonal plates',
+      color:'colourless', gloss:'glassy', nucleo:0.7, surface:0.2,
+      note:'Only in alumina-rich, flux-poor glazes. Takes Cr (ruby) or Fe/Ti (sapphire).' }),
+
+  P({ id:'mullite', name:'Mullite', formula:'Al6Si2O13', kind:'silicate',
+      req:{ Al2O3:3, SiO2:1 }, Tm:2120, dHf:120000, Vm:135, n:1.64,
+      system:'orthorhombic', sg:'Pbam', shape:'needle',
+      habit:'acicular needles, matte felting',
+      color:'white', gloss:'dull', nucleo:0.6, surface:0.2,
+      note:'The matte-maker of high-alumina glazes: a felt of needles at the surface scatters light.' }),
+
+  P({ id:'anorthite', name:'Anorthite', formula:'CaAl2Si2O8', kind:'silicate',
+      req:{ CaO:1, Al2O3:1, SiO2:2 }, Tm:1826, dHf:130000, Vm:101, n:1.58,
+      system:'triclinic', sg:'P-1', shape:'blade',
+      habit:'lath-like crystals, dull',
+      color:'white', gloss:'dull', nucleo:0.9, surface:0.4,
+      note:'Calcium feldspar: the usual cause of a "dry" matte in high-Ca glazes cooled slowly.' }),
+
+  P({ id:'diopside', name:'Diopside', formula:'CaMgSi2O6', kind:'silicate',
+      req:{ CaO:1, MgO:1, SiO2:2 }, Tm:1664, dHf:100000, Vm:66, n:1.68,
+      system:'monoclinic', sg:'C2/c', shape:'needle',
+      habit:'prismatic, radiating',
+      color:'white', gloss:'glassy', nucleo:1.0, surface:0.4,
+      note:'Ca-Mg pyroxene; gives a soft satin matte and hosts Cr as chrome-diopside green.' }),
+
+  P({ id:'wollastonite', name:'Wollastonite', formula:'CaSiO3', kind:'silicate',
+      req:{ CaO:1, SiO2:1 }, Tm:1813, dHf:60000, Vm:40, n:1.63,
+      system:'triclinic', sg:'P-1', shape:'blade',
+      habit:'bladed, fibrous, radiating',
+      color:'white', gloss:'dull', nucleo:1.1, surface:0.5,
+      note:'High-lime, low-alumina melts devitrify to wollastonite on slow cooling: a harsh, dry matte.' }),
+
+  P({ id:'celsian', name:'Celsian', formula:'BaAl2Si2O8', kind:'silicate',
+      req:{ BaO:1, Al2O3:1, SiO2:2 }, Tm:1863, dHf:120000, Vm:105, n:1.59,
+      system:'monoclinic', sg:'I2/c', shape:'blade',
+      habit:'prismatic laths',
+      color:'white', gloss:'dull', nucleo:0.8, surface:0.3,
+      note:'Barium feldspar; barium is the one alkaline earth that reliably stays glossy, so celsian only appears in slow-cooled high-Ba work.' }),
+
+  /* ---------------- alkali silicates ---------------------------------------- */
+  P({ id:'leucite', name:'Leucite', formula:'KAlSi2O6', kind:'silicate',
+      req:{ K2O:1, Al2O3:1, SiO2:2 }, Tm:1962, dHf:100000, Vm:88, n:1.51,
+      system:'tetragonal', sg:'I41/a', shape:'octahedron',
+      habit:'trapezohedral, rounded, often skeletal',
+      color:'white', gloss:'dull', nucleo:0.7, surface:0.3,
+      note:'Potash-rich melts. Its 2% thermal expansion mismatch is what crazes so many high-potash glazes.' }),
+
+  P({ id:'nepheline', name:'Nepheline', formula:'NaAlSiO4', kind:'silicate',
+      req:{ Na2O:1, Al2O3:1, SiO2:1 }, Tm:1799, dHf:90000, Vm:54, n:1.53,
+      system:'hexagonal', sg:'P63', shape:'octahedron',
+      habit:'prismatic, rounded',
+      color:'white', gloss:'dull', nucleo:0.8, surface:0.3,
+      note:'Soda-rich, silica-poor melts (nepheline syenite bodies).' }),
+
+  P({ id:'spodumene', name:'Spodumene', formula:'LiAlSi2O6', kind:'silicate',
+      req:{ Li2O:1, Al2O3:1, SiO2:2 }, Tm:1693, dHf:80000, Vm:66, n:1.66,
+      system:'monoclinic', sg:'C2/c', shape:'blade',
+      habit:'prismatic, elongated',
+      color:'white', gloss:'glassy', nucleo:0.8, surface:0.3,
+      note:'Lithia source; usually dissolves fully and re-precipitates only in slow cools.' }),
+
+  P({ id:'lidisilicate', name:'Lithium disilicate', formula:'Li2Si2O5', kind:'silicate',
+      req:{ Li2O:1, SiO2:2 }, Tm:1306, dHf:60000, Vm:60, n:1.55,
+      system:'orthorhombic', sg:'Ccc2', shape:'spherulite',
+      habit:'lath rosettes, spherulites',
+      color:'white', gloss:'glassy', nucleo:1.7, surface:0.6,
+      note:'The workhorse of glass-ceramics: it nucleates and grows fast just above 800 C, which is why lithium crystalline glazes bloom so easily.' }),
+
+  P({ id:'quartz', name:'Quartz', formula:'SiO2', kind:'oxide',
+      req:{ SiO2:1 }, Tm:1986, dHf:9500, Vm:22.7, n:1.55,
+      system:'trigonal', sg:'P3221', shape:'hex',
+      habit:'hexagonal dipyramids',
+      color:'white', gloss:'glassy', nucleo:0.5, surface:0.1,
+      note:'Survives only as undissolved grains; it does not grow from a glaze melt.' }),
+
+  P({ id:'cristobalite', name:'Cristobalite', formula:'SiO2', kind:'oxide',
+      req:{ SiO2:1 }, Tm:1986, dHf:8500, Vm:25.7, n:1.48,
+      system:'cubic', sg:'Fd-3m', shape:'spherulite',
+      habit:'spherulitic, fine-grained',
+      color:'white', gloss:'dull', nucleo:1.0, surface:0.6,
+      note:'High-temperature silica polymorph. A thin cristobalite skin is a common cause of "crazing on cooling" and of a faint matte.' }),
+
+  /* ---------------- phosphorus ---------------------------------------------- */
+  P({ id:'apatite', name:'Apatite', formula:'Ca5(PO4)3(OH)', kind:'silicate',
+      req:{ CaO:5, P2O5:1.5 }, Tm:1923, dHf:150000, Vm:160, n:1.65,
+      system:'hexagonal', sg:'P63/m', shape:'hex',
+      habit:'hexagonal prisms, needles',
+      color:'white', gloss:'dull', nucleo:1.2, surface:0.4,
+      note:'Bone ash or tricalcium phosphate in a high-Ca glaze; a soft opal matte.' }),
+
+  /* ---------------- copper --------------------------------------------------- */
+  P({ id:'cuprite', name:'Cuprite', formula:'Cu2O', kind:'oxide',
+      req:{ CuO:2 }, Tm:1505, dHf:55000, Vm:23.4, n:2.85,
+      system:'cubic', sg:'Pn-3m', shape:'octahedron',
+      habit:'octahedra, dendritic skeletons, red internal reflections',
+      color:'deep red', gloss:'adamantine', nucleo:1.3, surface:0.5,
+      needs:{ species:'Cu+', min:0.25 },
+      note:'Ruby-red cuprite is what makes a copper-red glaze look red under a hand lens; the colour is a mix of colloidal Cu and Cu2O.' }),
+
+  P({ id:'tenorite', name:'Tenorite', formula:'CuO', kind:'oxide',
+      req:{ CuO:1 }, Tm:1599, dHf:45000, Vm:12.6, n:2.6,
+      system:'monoclinic', sg:'C2/c', shape:'blade',
+      habit:'black scales and crusts',
+      color:'black', gloss:'dull', nucleo:0.9, surface:0.4,
+      needs:{ species:'Cu2+', min:0.3 },
+      note:'Oxidised copper: black, crusty, and usually a fault in a copper red.' }),
+
+  P({ id:'copper', name:'Copper metal', formula:'Cu', kind:'metal',
+      req:{ CuO:1 }, Tm:1358, dHf:13000, Vm:7.1, n:0.6,
+      system:'cubic', sg:'Fm-3m', shape:'bead',
+      habit:'colloidal nanospheres (10-60 nm) or metallic dendrites',
+      color:'copper-red', gloss:'metallic', nucleo:2.0, surface:0.5,
+      needs:{ species:'Cu0', min:0.12 },
+      note:'Red is a size effect: 10-30 nm particles absorb at ~570 nm and look ruby; grow them past 100 nm and the glaze turns liver-brown and metallic.' }),
+
+  P({ id:'silver', name:'Silver metal', formula:'Ag', kind:'metal',
+      req:{ Ag2O:0.5 }, Tm:1235, dHf:11300, Vm:10.3, n:0.2,
+      system:'cubic', sg:'Fm-3m', shape:'bead',
+      habit:'colloidal clusters, dendritic films',
+      color:'yellow', gloss:'metallic', nucleo:2.0, surface:0.6,
+      needs:{ species:'Ag0', min:0.1 },
+      note:'Silver luster: yellow to gold, and it tarnishes to purple-black in sulphur.' }),
+
+  /* ---------------- bismuth: the case in the video --------------------------- */
+  P({ id:'bismuth', name:'Bismuth metal', formula:'Bi', kind:'metal',
+      req:{ Bi2O3:0.5 }, Tm:544.7, dHf:11300, Vm:21.3, n:0.5,
+      system:'trigonal', sg:'R-3m', shape:'triangle',
+      habit:'hopper crystals: triangular plates with spiral growth steps and skeletal re-entrant edges',
+      color:'silver', gloss:'metallic', nucleo:2.2, surface:0.7,
+      needs:{ species:'Bi0', min:0.08 },
+      note:'Bi3+ + 3e- -> Bi0 (E0 +0.31 V). Reduced bismuth is immiscible with the silicate melt, so it beads into droplets; each droplet freezes at 271 C into a hopper crystal with the trigonal symmetry of the rhombohedral lattice (a = 4.55 A, alpha = 57.2 deg). The iridescence is a 40-200 nm Bi2O3 tarnish film.' }),
+
+  P({ id:'bismuthoxide', name:'Bismuth oxide (a)', formula:'Bi2O3', kind:'oxide',
+      req:{ Bi2O3:1 }, Tm:1098, dHf:45000, Vm:52.4, n:2.5,
+      system:'monoclinic', sg:'P21/c', shape:'blade',
+      habit:'yellow microcrystals, crusts',
+      color:'pale yellow', gloss:'adamantine', nucleo:1.0, surface:0.5,
+      needs:{ species:'Bi3+', min:0.2 },
+      note:'Oxidised bismuth stays as a glass former/flux; it only crystallises as Bi2O3 in heavily loaded, slowly cooled glazes.' }),
+
+  P({ id:'eulytite', name:'Eulytite', formula:'Bi4Si3O12', kind:'silicate',
+      req:{ Bi2O3:2, SiO2:3 }, Tm:1273, dHf:120000, Vm:200, n:2.1,
+      system:'cubic', sg:'I-43d', shape:'octahedron',
+      habit:'euhedral dodecahedra',
+      color:'pale yellow', gloss:'adamantine', nucleo:1.2, surface:0.4,
+      needs:{ species:'Bi3+', min:0.3 },
+      note:'Bismuth silicate, the phase to expect in an oxidised high-bismuth glaze held near 800-900 C. Pale yellow, high refractive index.' }),
+
+  P({ id:'sillenite', name:'Sillenite', formula:'Bi12SiO20', kind:'oxide',
+      req:{ Bi2O3:6, SiO2:1 }, Tm:1173, dHf:150000, Vm:330, n:2.3,
+      system:'cubic', sg:'I23', shape:'octahedron',
+      habit:'tetrahedral, strongly striated',
+      color:'pale yellow', gloss:'adamantine', nucleo:1.1, surface:0.4,
+      needs:{ species:'Bi3+', min:0.35 },
+      note:'Bi12SiO20, the gamma-phase of the Bi2O3-SiO2 system: cubic, optically active, and a sign of a very bismuth-rich oxidised melt.' }),
+
+  /* ---------------- cobalt / nickel / chrome / manganese --------------------- */
+  P({ id:'thenardite', name:'Cobalt aluminate', formula:'CoAl2O4', kind:'oxide',
+      req:{ CoO:1, Al2O3:1 }, Tm:2233, dHf:100000, Vm:40.2, n:1.85,
+      system:'cubic', sg:'Fd-3m', shape:'octahedron',
+      habit:'octahedra',
+      color:'deep blue', gloss:'dull', nucleo:1.1, surface:0.3,
+      note:'The stable blue spinel pigment. Once cobalt is locked into CoAl2O4 the colour stops moving with the glaze chemistry.' }),
+
+  P({ id:'chromite', name:'Chromite', formula:'FeCr2O4', kind:'oxide',
+      req:{ FeO:1, Cr2O3:1 }, Tm:2473, dHf:100000, Vm:44, n:2.1,
+      system:'cubic', sg:'Fd-3m', shape:'octahedron',
+      habit:'octahedra',
+      color:'black', gloss:'metallic', nucleo:1.0, surface:0.3,
+      needs:{ species:'Cr3+', min:0.4 },
+      note:'Chrome + iron in reduction: black spinel, and the reason chrome greens go muddy in a reduction kiln.' }),
+
+  P({ id:'spinel', name:'Spinel', formula:'MgAl2O4', kind:'oxide',
+      req:{ MgO:1, Al2O3:1 }, Tm:2408, dHf:100000, Vm:39.7, n:1.72,
+      system:'cubic', sg:'Fd-3m', shape:'octahedron',
+      habit:'octahedra',
+      color:'colourless', gloss:'glassy', nucleo:0.9, surface:0.2,
+      note:'Mg-Al spinel: a refractory scatterer, occasionally seen in high-magnesia mattes.' }),
+
+  P({ id:'hausmannite', name:'Hausmannite', formula:'Mn3O4', kind:'oxide',
+      req:{ MnO:3, }, Tm:1833, dHf:60000, Vm:44, n:2.15,
+      system:'tetragonal', sg:'I41/amd', shape:'octahedron',
+      habit:'bipyramidal, granular',
+      color:'brown-black', gloss:'dull', nucleo:1.0, surface:0.3,
+      note:'Oxidised manganese at high temperature; on cooling it can exsolve as brown-black dendrites.' }),
+
+  P({ id:'cerianite', name:'Cerianite', formula:'CeO2', kind:'oxide',
+      req:{ CeO2:1 }, Tm:2673, dHf:60000, Vm:23.9, n:2.2,
+      system:'cubic', sg:'Fm-3m', shape:'octahedron',
+      habit:'fine cubic crystallites',
+      color:'pale cream', gloss:'dull', nucleo:0.9, surface:0.2,
+      note:'Cerium opacifier; redox-active (Ce3+/Ce4+) and can tint a glaze towards cream in reduction.' })
+];
+
+GC.PHASE_BY_ID = {};
+GC.PHASES.forEach(function (p) { GC.PHASE_BY_ID[p.id] = p; });
+
+/* species that get a redox fraction, with the couple they represent */
+GC.REDOX = [
+  { el:'Ag', ox:'Ag0',  oxidised:'Ag+',  ease:0.96, label:'Ag+ + e- -> Ag0',  E0:0.80 },
+  { el:'Au', ox:'Au0',  oxidised:'Au3+', ease:0.98, label:'Au3+ + 3e- -> Au0',E0:1.50 },
+  { el:'Cu', ox:'Cu0',  oxidised:'Cu2+', ease:0.74, label:'Cu2+ + 2e- -> Cu0',E0:0.34 },
+  { el:'Bi', ox:'Bi0',  oxidised:'Bi3+', ease:0.70, label:'Bi3+ + 3e- -> Bi0',E0:0.31 },
+  { el:'Sb', ox:'Sb0',  oxidised:'Sb3+', ease:0.64, label:'Sb3+ + 3e- -> Sb0',E0:0.15 },
+  { el:'Sn', ox:'Sn2+', oxidised:'Sn4+', ease:0.46, label:'Sn4+ + 2e- -> Sn2+',E0:0.15 },
+  { el:'Fe', ox:'Fe2+', oxidised:'Fe3+', ease:0.44, label:'Fe3+ + e- -> Fe2+', E0:0.77 },
+  { el:'U',  ox:'U5+',  oxidised:'U6+',  ease:0.38, label:'U6+ + e- -> U5+',  E0:0.16 },
+  { el:'V',  ox:'V4+',  oxidised:'V5+',  ease:0.36, label:'V5+ + e- -> V4+',  E0:0.99 },
+  { el:'Cr', ox:'Cr3+', oxidised:'Cr6+', ease:0.30, label:'Cr6+ + 3e- -> Cr3+',E0:1.33 },
+  { el:'Mn', ox:'Mn2+', oxidised:'Mn3+', ease:0.24, label:'Mn3+ + e- -> Mn2+', E0:1.51 },
+  { el:'Ti', ox:'Ti3+', oxidised:'Ti4+', ease:0.18, label:'Ti4+ + e- -> Ti3+', E0:0.10 }
+];
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* GLAZECAST — optics: ligand-field absorption, Mie-lite scattering,
+ * thin-film interference, and CIE colour.  Real colour science, not a palette.
+ */
+(function (root) {
+'use strict';
+var GC = root.GC = root.GC || {};
+
+/* ---------------- CIE 1931 colour matching (Wyman/Sloan/Shirley fit) ------- */
+function g(x, mu, s1, s2) {
+  var t = (x - mu) * (x < mu ? 1 / s1 : 1 / s2);
+  return Math.exp(-0.5 * t * t);
+}
+function cmf(lam) {
+  var x = 1.056 * g(lam, 599.8, 37.9, 31.0) + 0.362 * g(lam, 442.0, 16.0, 26.7) - 0.065 * g(lam, 501.1, 20.4, 26.2);
+  var y = 0.821 * g(lam, 568.8, 46.9, 40.5) + 0.286 * g(lam, 530.9, 16.3, 31.1);
+  var z = 1.217 * g(lam, 437.0, 11.8, 36.0) + 0.681 * g(lam, 459.0, 26.0, 13.8);
+  return [x, y, z];
+}
+
+/* ---------------- spectrum -> sRGB ---------------------------------------- */
+function linRGB(X, Y, Z) {
+  return [
+    3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+    -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+    0.0557 * X - 0.2040 * Y + 1.0570 * Z
+  ];
+}
+function encode(v) {
+  v = Math.max(0, v);
+  return v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+}
+function srgbFromXYZ(X, Y, Z, white) {
+  var lin = linRGB(X, Y, Z);
+  var w = white || linRGB(0.95047, 1.0, 1.08883);
+  return [encode(lin[0] / w[0]), encode(lin[1] / w[1]), encode(lin[2] / w[2])]
+    .map(function (v) { return Math.round(GC.util.clamp(v, 0, 1) * 255); });
+}
+
+function integrate(fn, lo, hi) {
+  var X = 0, Y = 0, Z = 0, norm = 0;
+  for (var lam = lo; lam <= hi; lam += 2) {
+    var v = fn(lam);
+    if (!isFinite(v)) v = 0;
+    var c = cmf(lam);
+    X += v * c[0]; Y += v * c[1]; Z += v * c[2];
+    norm += c[1];
+  }
+  return [X / norm, Y / norm, Z / norm];
+}
+
+var WHITE_LIN = null;
+function spectrumToRGB(fn) {
+  if (!WHITE_LIN) WHITE_LIN = linRGB.apply(null, integrate(function () { return 1; }, 380, 730));
+  var xyz = integrate(fn, 380, 730);
+  return srgbFromXYZ(xyz[0], xyz[1], xyz[2], WHITE_LIN);
+}
+
+/* ---------------- absorption bands --------------------------------------- */
+var BANDS = {
+  'Co2+':   [{ l: 590, w: 50, s: 1.00 }, { l: 625, w: 65, s: 0.55 }, { l: 480, w: 60, s: 0.30 }],
+  'Co2+oc': [{ l: 510, w: 70, s: 0.55 }, { l: 590, w: 60, s: 0.22 }],
+  'Cu2+':   [{ l: 830, w: 170, s: 1.00 }, { l: 460, w: 70, s: 0.15 }],
+  'Cu+':    [],
+  'Cu0':    [{ l: 545, w: 105, s: 1.00 }, { l: 460, w: 80, s: 0.90 }],
+  'Fe3+':   [{ l: 420, w: 70, s: 1.00 }, { l: 500, w: 100, s: 0.30 }, { l: 860, w: 120, s: 0.15 }],
+  'Fe2+':   [{ l: 1050, w: 200, s: 1.00 }, { l: 640, w: 140, s: 0.25 }],
+  'Mn3+':   [{ l: 505, w: 85, s: 1.00 }],
+  'Mn2+':   [{ l: 545, w: 45, s: 0.15 }],
+  'Cr3+':   [{ l: 455, w: 55, s: 0.70 }, { l: 600, w: 65, s: 0.85 }],
+  'Cr6+':   [{ l: 372, w: 46, s: 1.00 }],
+  'Ni2+':   [{ l: 420, w: 60, s: 0.70 }, { l: 660, w: 100, s: 0.60 }, { l: 1100, w: 160, s: 0.50 }],
+  'V5+':    [{ l: 382, w: 62, s: 1.00 }],
+  'V4+':    [{ l: 610, w: 130, s: 0.35 }],
+  'U6+':    [{ l: 425, w: 72, s: 1.00 }],
+  'U5+':    [{ l: 620, w: 120, s: 0.30 }],
+  'Ti4+':   [],
+  'Ti3+':   [{ l: 580, w: 180, s: 0.55 }],
+  'Nd3+':   [{ l: 582, w: 26, s: 1.00 }, { l: 525, w: 22, s: 0.60 }, { l: 745, w: 30, s: 0.40 }],
+  'Pr3+':   [{ l: 445, w: 26, s: 0.80 }],
+  'Er3+':   [{ l: 522, w: 28, s: 1.00 }],
+  'Ce4+':   [{ l: 335, w: 55, s: 0.30 }],
+  'Ag0':    [{ l: 412, w: 52, s: 1.00 }],
+  'Au0':    [{ l: 532, w: 62, s: 1.00 }],
+  'Cd2+':   [{ l: 400, w: 40, s: 1.00 }],
+  'Sb3+':   [],
+  'Sn4+':   []
+};
+
+function absorptionAt(lam, absorbers) {
+  var A = 0;
+  for (var i = 0; i < absorbers.length; i++) {
+    var a = absorbers[i];               // {species, strength}
+    var bands = BANDS[a.species];
+    if (!bands || !bands.length) continue;
+    var s = 0;
+    for (var j = 0; j < bands.length; j++) {
+      var t = (lam - bands[j].l) / bands[j].w;
+      s += bands[j].s * Math.exp(-t * t);
+    }
+    A += a.strength * s;
+  }
+  return A;
+}
+
+/* ---------------- scattering (van de Hulst anomalous diffraction) --------- */
+function scatterQ(r, lam, m) {
+  var x = 2 * Math.PI * r / (lam * 1e-9) * 1.5;   // size parameter in the medium
+  if (x > 1e4) return 2;
+  var p = 2 * x * (m - 1);
+  if (Math.abs(p) < 1e-4) return 4 * x * x * x * (m - 1) * (m - 1) / 3;
+  return 2 - (4 / p) * Math.sin(p) + (4 / (p * p)) * (1 - Math.cos(p));
+}
+
+/* scattering coefficient per wavelength (1/m) */
+function scatterMu(lam, scatters, phiScale) {
+  var mu = 0;
+  for (var i = 0; i < scatters.length; i++) {
+    var s = scatters[i];                       // {r (m), phi, n}
+    if (s.phi <= 1e-6) continue;
+    var q = scatterQ(s.r, lam, s.n / 1.52);
+    mu += 3 * s.phi * q / (4 * s.r);
+  }
+  return mu * (phiScale || 1);
+}
+
+/* ---------------- thin film on a metal ----------------------------------- */
+function cmul(ar, ai, br, bi) { return [ar * br - ai * bi, ar * bi + ai * br]; }
+function cdiv(ar, ai, br, bi) {
+  var d = br * br + bi * bi;
+  return [(ar * br + ai * bi) / d, (ai * br - ar * bi) / d];
+}
+
+/* reflectance of air / film(n1) / substrate(n2,k2) at normal incidence */
+function filmReflectance(lamNm, dNm, n1, n2, k2) {
+  var r01r = (1 - n1) / (1 + n1), r01i = 0;
+  var den = (n1 + n2) * (n1 + n2) + k2 * k2;
+  var r12r = (n1 * n1 - n2 * n2 - k2 * k2) / den;
+  var r12i = (2 * n1 * k2) / den;
+  var beta = 2 * Math.PI * n1 * dNm / lamNm;
+  var er = Math.cos(2 * beta), ei = -Math.sin(2 * beta);
+  var tr = r12r * er - r12i * ei, ti = r12r * ei + r12i * er;
+  var nr = r01r + tr, ni = r01i + ti;
+  var dr = 1 + (r01r * tr - r01i * ti), di = (r01r * ti + r01i * tr);
+  var r = cdiv(nr, ni, dr, di);
+  return r[0] * r[0] + r[1] * r[1];
+}
+
+var METAL_N = {
+  Bi: { n: 1.90, k: 3.00, base: 0.55 },
+  Cu: { n: 0.95, k: 2.60, base: 0.60 },
+  Ag: { n: 0.15, k: 3.60, base: 0.92 },
+  Au: { n: 0.35, k: 2.80, base: 0.80 }
+};
+
+function iridescentPalette(metal, nFilm) {
+  var m = METAL_N[metal] || METAL_N.Bi;
+  var out = [];
+  for (var d = 0; d <= 340; d += 10) {
+    var rgb = spectrumToRGB(function (lam) {
+      var R = filmReflectance(lam, d, nFilm, m.n, m.k);
+      return m.base * 0.45 + 0.55 * R;    // metal body + interference
+    });
+    out.push({ d: d, rgb: rgb });
+  }
+  return out;
+}
+
+/* ---------------- the appearance call ------------------------------------ */
+/* opts: { absorbers:[{species,strength}], scatters:[{r,phi,n}], metal:{type,filmNm,colour}, body }
+ */
+function appearance(opts) {
+  var abs = opts.absorbers || [];
+  var sc = opts.scatters || [];
+  var metal = opts.metal || null;
+  var body = opts.body === undefined ? 0.88 : opts.body;
+
+  if (metal) {
+    var mn = METAL_N[metal.type] || METAL_N.Bi;
+    var film = metal.filmNm || 0;
+    var rgbM = spectrumToRGB(function (lam) {
+      var R = film > 0 ? filmReflectance(lam, film, metal.nFilm || 2.1, mn.n, mn.k) : 0;
+      var base = 0.30 + 0.78 * Math.min(1, R);
+      return Math.min(1, base) * (0.72 + 0.35 * mn.base) + 0.05;
+    });
+    return { rgb: rgbM, kind: 'metal', opacity: 1, note: 'metallic' };
+  }
+
+  var rgb = spectrumToRGB(function (lam) {
+    var A = absorptionAt(lam, abs);
+    var T = Math.exp(-A);
+    var mu = scatterMu(lam, sc);
+    var L = 0.00035;                      // 0.35 mm glaze, two passes
+    var transmitted = T * T * Math.exp(-mu * L);
+    var veil = 1 - Math.exp(-mu * L);
+    var v = 0.018 + 0.982 * (body * transmitted * (1 - veil) + 0.92 * veil);
+    return v;
+  });
+
+  var mu550 = scatterMu(550, sc) * 0.00035;
+  var opacity = GC.util.clamp(1 - Math.exp(-mu550), 0, 1);
+  return { rgb: rgb, kind: 'glass', opacity: opacity, note: '' };
+}
+
+function toHex(rgb) {
+  return '#' + rgb.map(function (v) {
+    var h = Math.round(GC.util.clamp(v, 0, 255)).toString(16);
+    return h.length < 2 ? '0' + h : h;
+  }).join('');
+}
+
+function toCss(rgb, a) {
+  return 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + (a === undefined ? 1 : a) + ')';
+}
+
+/* perceived colour name, for the verdict line */
+function colourName(rgb) {
+  var r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  var v = mx, s = mx === 0 ? 0 : (mx - mn) / mx;
+  var h = 0;
+  var d = mx - mn;
+  if (d > 1e-4) {
+    if (mx === r) h = ((g - b) / d) % 6;
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  if (v < 0.12) return 'near-black';
+  if (s < 0.10) return v > 0.75 ? 'white' : v > 0.42 ? 'grey' : 'charcoal';
+  if (s < 0.22) return v > 0.7 ? 'off-white' : 'smoke';
+  var names = [
+    [15, 'crimson'], [40, 'orange-red'], [55, 'amber'], [70, 'yellow-ochre'],
+    [90, 'chartreuse'], [140, 'green'], [170, 'teal'], [200, 'sky blue'],
+    [225, 'cobalt blue'], [255, 'indigo'], [285, 'violet'], [320, 'magenta'],
+    [345, 'rose'], [361, 'crimson']
+  ];
+  for (var i = 0; i < names.length; i++) {
+    if (h < names[i][0]) {
+      var base = names[i][1];
+      if (v < 0.32) return 'deep ' + base;
+      if (v > 0.82 && s < 0.5) return 'pale ' + base;
+      return base;
+    }
+  }
+  return 'crimson';
+}
+
+GC.color = {
+  cmf: cmf,
+  spectrumToRGB: spectrumToRGB,
+  srgbFromXYZ: srgbFromXYZ,
+  absorptionAt: absorptionAt,
+  scatterQ: scatterQ,
+  scatterMu: scatterMu,
+  filmReflectance: filmReflectance,
+  iridescentPalette: iridescentPalette,
+  appearance: appearance,
+  toHex: toHex,
+  toCss: toCss,
+  colourName: colourName,
+  BANDS: BANDS,
+  METAL_N: METAL_N
+};
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* GLAZECAST — the engine.
+ *
+ * chain:  recipe -> oxide moles -> unity formula
+ *         atmosphere -> redox speciation (which oxidation states exist)
+ *         speciation + melt structure -> candidate phases + liquidus depression
+ *         kiln schedule -> time-temperature path -> TTT intersection -> volume fraction
+ *         crystals + dopants -> optics -> appearance
+ *
+ * Honesty note: the *thermodynamic* skeleton (which oxides, which structures,
+ * which redox couples, liquidus depression, driving force) is standard.
+ * The absolute kinetic constants are calibrated against known glaze outcomes,
+ * because real nucleation rates in a glaze depend on the body, the interface
+ * and the kiln in ways no desktop model resolves. Treat times as +/- half a
+ * decade and rankings as the real output.
+ */
+(function (root) {
+'use strict';
+var GC = root.GC = root.GC || {};
+var U = GC.util;
+var R_GAS = 8.314462;
+
+/* oxide thermal expansion contributions, x1e-7 /C (additive, Appen-type) */
+var ALPHA = {
+  SiO2: 5, Al2O3: 55, B2O3: 5, P2O5: 50, Na2O: 395, K2O: 465, Li2O: 270,
+  CaO: 130, MgO: 60, BaO: 200, SrO: 180, ZnO: 70, PbO: 130, Bi2O3: 150,
+  Fe2O3: 110, FeO: 120, TiO2: 80, ZrO2: 25, SnO2: 40, MnO: 100, CuO: 90,
+  CoO: 90, NiO: 90, Cr2O3: 70, V2O5: 120, Sb2O3: 120, CeO2: 60,
+  Pr6O11: 90, Nd2O3: 90, Er2O3: 80
+};
+
+/* ------------------------------------------------------------------ *
+ * Saturation thresholds, in unity-formula units of the key oxide.
+ * These are the compositions at which the phase actually starts to appear
+ * in real glazes; they stand in for the activity coefficients that a full
+ * thermodynamic database would supply.
+ * ------------------------------------------------------------------ */
+var CRIT = {
+  willemite:    { ZnO: 0.35 },
+  zincite:      { ZnO: 0.60 },
+  gahnite:      { ZnO: 0.30, Al2O3: 0.25 },
+  hematite:     { Fe2O3: 0.10 },
+  magnetite:    { FeO: 0.06, Fe2O3: 0.06 },
+  zincferrite:  { ZnO: 0.20, Fe2O3: 0.10 },
+  rutile:       { TiO2: 0.08 },
+  anatase:      { TiO2: 0.08 },
+  cassiterite:  { SnO2: 0.10 },
+  zircon:       { ZrO2: 0.12 },
+  baddeleyite:  { ZrO2: 0.30 },
+  corundum:     { Al2O3: 0.90 },
+  mullite:      { Al2O3: 0.70 },
+  anorthite:    { CaO: 0.55, Al2O3: 0.35 },
+  diopside:     { CaO: 0.45, MgO: 0.30 },
+  wollastonite: { CaO: 0.65 },
+  celsian:      { BaO: 0.20 },
+  leucite:      { K2O: 0.35 },
+  nepheline:    { Na2O: 0.50 },
+  spodumene:    { Li2O: 0.10 },
+  lidisilicate: { Li2O: 0.12 },
+  quartz:       { SiO2: 5.0 },
+  cristobalite: { SiO2: 4.5 },
+  apatite:      { P2O5: 0.08, CaO: 0.30 },
+  cuprite:      { CuO: 0.015 },
+  tenorite:     { CuO: 0.012 },
+  copper:       { CuO: 0.004 },
+  silver:       { Ag2O: 0.002 },
+  bismuth:      { Bi2O3: 0.004 },
+  bismuthoxide: { Bi2O3: 0.15 },
+  eulytite:     { Bi2O3: 0.08, SiO2: 0.50 },
+  sillenite:    { Bi2O3: 0.20 },
+  thenardite:   { CoO: 0.005, Al2O3: 0.20 },
+  chromite:     { FeO: 0.05, Cr2O3: 0.010 },
+  spinel:       { MgO: 0.40, Al2O3: 0.60 },
+  hausmannite:  { MnO: 0.05 },
+  cerianite:    { CeO2: 0.05 }
+};
+
+var KD = 430;            /* K of liquidus depression per e-fold of undersaturation */
+var SAT_FLOOR = 0.62;    /* below this saturation ratio the phase cannot exist     */
+
+var emptyMap = function () { return Object.create(null); };
+
+/* ------------------------------------------------------------------ *
+ * 1. composition
+ * ------------------------------------------------------------------ */
+function compose(recipe) {
+  var moles = emptyMap(), mass = emptyMap(), totalMass = 0, loi = 0, used = [];
+
+  recipe.forEach(function (line) {
+    var mat = GC.MATERIAL_BY_ID[line.id];
+    if (!mat || !(line.wt > 0)) return;
+    used.push({ id: line.id, name: mat.name, wt: line.wt });
+    totalMass += line.wt;
+    loi += line.wt * (mat.loi || 0) / 100;
+    mat.analysis.forEach(function (pair) {
+      var ox = GC.OXIDES[pair[0]];
+      if (!ox) return;
+      var m = line.wt * pair[1] / 100;
+      mass[pair[0]] = (mass[pair[0]] || 0) + m;
+      moles[pair[0]] = (moles[pair[0]] || 0) + m / ox.mr;
+    });
+  });
+
+  var totalMoles = 0, oxygens = 0, tetra = 0, lamNum = 0, lamDen = 0, fluxBasis = 0;
+  Object.keys(moles).forEach(function (k) {
+    var n = moles[k], ox = GC.OXIDES[k];
+    totalMoles += n;
+    oxygens += n * ox.O;
+    tetra += n * ox.T;
+    lamNum += n * ox.O * ox.lambda;
+    lamDen += n * ox.O;
+    if (ox.role === 'flux') fluxBasis += n;
+  });
+  if (fluxBasis <= 0) fluxBasis = totalMoles || 1;
+
+  var unity = emptyMap();
+  Object.keys(moles).forEach(function (k) { unity[k] = moles[k] / fluxBasis; });
+
+  var nboT = tetra > 0 ? (oxygens / tetra) - 2 : 0;
+  var basicity = lamDen > 0 ? lamNum / lamDen : 0.6;
+
+  var r2o = (moles.Na2O || 0) + (moles.K2O || 0) + (moles.Li2O || 0);
+  var ro = (moles.CaO || 0) + (moles.MgO || 0) + (moles.BaO || 0) + (moles.SrO || 0) +
+           (moles.ZnO || 0) + (moles.PbO || 0) + (moles.Bi2O3 || 0) + (moles.FeO || 0) +
+           (moles.MnO || 0) + (moles.CuO || 0) + (moles.CoO || 0) + (moles.NiO || 0);
+
+  var cte = 0, cteDen = 0;
+  Object.keys(moles).forEach(function (k) {
+    var a = ALPHA[k];
+    if (a === undefined) return;
+    cte += moles[k] * a; cteDen += moles[k];
+  });
+  cte = cteDen > 0 ? cte / cteDen : 50;
+
+  return {
+    recipe: recipe, used: used,
+    totalMass: totalMass || 1, loi: loi,
+    moles: moles, mass: mass, unity: unity,
+    totalMoles: totalMoles, fluxBasis: fluxBasis,
+    nboT: nboT, basicity: basicity,
+    r2o: r2o / fluxBasis, ro: ro / fluxBasis,
+    siAl: (moles.SiO2 || 0) / Math.max(moles.Al2O3 || 1e-9, 1e-9),
+    b2o3: unity.B2O3 || 0, cte: cte
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 2. firing schedule -> T(t)
+ * ------------------------------------------------------------------ */
+function buildSchedule(firing) {
+  var amb = 25;
+  var tauMin = { fast: 25, normal: 75, slow: 200, vslow: 420 }[firing.cooling] || 75;
+  var tau = tauMin * 60;
+  var holdC = firing.holdC;
+  var holdS = (firing.holdMin || 0) * 60;
+  var soakS = (firing.soakMin || 0) * 60;
+  var segs = [];
+  var peak = firing.peakC;
+  var t = 0;
+
+  if (soakS > 0) { segs.push({ t0: 0, t1: soakS, T: peak, kind: 'hold' }); t = soakS; }
+
+  if (holdC && holdC < peak) {
+    var dur = tau * Math.log((peak - amb) / Math.max(holdC - amb, 1));
+    segs.push({ t0: t, t1: t + dur, T0: peak, tau: tau, kind: 'cool' });
+    t += dur;
+    if (holdS > 0) { segs.push({ t0: t, t1: t + holdS, T: holdC, kind: 'hold' }); t += holdS; }
+    peak = holdC;
+  }
+  segs.push({ t0: t, t1: t + tau * 6, T0: peak, tau: tau, kind: 'cool' });
+
+  function T(ts) {
+    if (ts <= 0) return firing.peakC;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      if (ts <= s.t1) return s.kind === 'hold' ? s.T : amb + (s.T0 - amb) * Math.exp(-(ts - s.t0) / s.tau);
+    }
+    return amb;
+  }
+  var total = t + tau * 6;
+
+  var bins = new Float64Array(220);
+  var dt = 10;
+  for (var s2 = 0; s2 < total; s2 += dt) {
+    var i2 = Math.floor((T(s2) - 300) / 10);
+    if (i2 >= 0 && i2 < bins.length) bins[i2] += dt;
+  }
+
+  return {
+    T: T, total: total, bins: bins, peak: firing.peakC, holdC: holdC, holdS: holdS,
+    tau: tau, hasHold: holdS > 0,
+    coolingRate: { fast: 300, normal: 110, slow: 55, vslow: 28 }[firing.cooling] || 110
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. redox speciation
+ * ------------------------------------------------------------------ */
+var REDOX_FLOOR = { Ag: 0.85, Au: 0.85, Sb: 0.06, Cr: 0.82, Mn: 0.15, Ti: 0.02 };
+
+function speciate(comp, firing) {
+  var R = GC.ATMOSPHERES.filter(function (a) { return a.id === firing.atmosphere; })[0];
+  var strength = R ? R.strength : 0;
+  var sic = comp.mass.SiC || 0;
+  if (sic > 0) strength += 0.22 * Math.min(1, sic / 2);
+  strength = U.clamp(strength, 0, 1.05);
+
+  var out = { strength: strength, species: {}, elements: [] };
+  GC.REDOX.forEach(function (r) {
+    var amt = 0;
+    Object.keys(comp.moles).forEach(function (k) {
+      GC.OXIDES[k].cat.forEach(function (c) { if (c.el === r.el) amt += comp.moles[k] * c.n; });
+    });
+    if (amt <= 1e-9) return;
+    var floor = REDOX_FLOOR[r.el] || 0;
+    var reduced = floor + (1 - floor) / (1 + Math.exp(-(strength - (1 - r.ease)) / 0.115));
+    out.species[r.ox] = reduced;
+    out.species[r.oxidised] = 1 - reduced;
+    out.elements.push({
+      el: r.el, reducedFrac: reduced, species: r.ox, total: amt,
+      label: r.label, ease: r.ease, threshold: 1 - r.ease, floor: floor
+    });
+  });
+  out.R = strength;
+  return out;
+}
+
+/* effective moles of each oxide after redox partitioning */
+function pools(comp, spec) {
+  var p = emptyMap();
+  Object.keys(comp.moles).forEach(function (k) { p[k] = comp.moles[k]; });
+  var fFe = spec.species['Fe2+'] || 0;
+  var totalFe = 2 * (comp.moles.Fe2O3 || 0) + (comp.moles.FeO || 0);
+  if (totalFe > 1e-12) {
+    p.FeO = totalFe * fFe;
+    p.Fe2O3 = totalFe * (1 - fFe) / 2;
+  }
+  return p;
+}
+
+/* ------------------------------------------------------------------ *
+ * 4. candidate phases
+ * ------------------------------------------------------------------ */
+function candidates(comp, spec, sched) {
+  var pool = pools(comp, spec);
+  var volGlaze = comp.totalMass / 2.6;
+  var out = [];
+
+  GC.PHASES.forEach(function (p) {
+    if (p.needs) {
+      var f = spec.species[p.needs.species];
+      if (f === undefined || f < p.needs.min) return;
+    }
+    var crit = CRIT[p.id];
+    if (!crit) return;
+
+    var sat = Infinity, limiting = null, capacity = Infinity;
+    Object.keys(p.req).forEach(function (k) {
+      var c = crit[k];
+      if (c !== undefined) {
+        var u = (pool[k] || 0) / comp.fluxBasis;
+        sat = Math.min(sat, u / c);
+      }
+      var avail = (pool[k] || 0) / p.req[k];
+      if (avail < capacity) { capacity = avail; limiting = k; }
+    });
+    if (!isFinite(sat)) sat = 10;
+    if (sat < SAT_FLOOR || !isFinite(capacity) || capacity <= 1e-9) return;
+
+    if (p.kind === 'metal') {
+      var el = GC.OXIDES[Object.keys(p.req)[0]].cat[0].el;
+      var entry = spec.elements.filter(function (e) { return e.el === el; })[0];
+      if (!entry) return;
+      capacity *= entry.reducedFrac;
+    }
+
+    var volFrac = capacity * p.Vm / Math.max(volGlaze, 1e-6);
+    if (volFrac < 0.0004) return;
+
+    /* liquidus of this phase in this melt */
+    var TmEff = p.kind === 'metal'
+      ? p.Tm
+      : Math.min(p.Tm, p.Tm - KD * Math.log(1 + 1 / sat));
+
+    out.push({
+      phase: p, volFrac: Math.min(1, volFrac), capacity: capacity, sat: sat,
+      TmEff: TmEff, undissolved: TmEff > sched.peak, limiting: limiting,
+      nucleo: p.nucleo * (TmEff > sched.peak ? 1.8 : 1),
+      pool: pool
+    });
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * 5. TTT + growth
+ * ------------------------------------------------------------------ */
+function kinetics(cand, comp, sched, firing) {
+  var p = cand.phase;
+
+  /* a metal is already a separate liquid at temperature: it just freezes */
+  if (p.kind === 'metal') {
+    var coolF = { fast: 0.45, normal: 0.75, slow: 1.0, vslow: 1.0 }[firing.cooling] || 0.75;
+    var Xm = Math.min(1, Math.pow(cand.volFrac / 0.012, 0.6)) * coolF;
+    var sm = U.clamp(0.75 * Math.pow(cand.volFrac / 0.01, 1 / 3) * (0.55 + 0.5 * coolF), 0.01, 3.5);
+    /* the metal solidifies over the ~120 K straddling its freezing point */
+    var rec = Math.max(10, Math.floor(sched.total / 360));
+    var timeline = [];
+    for (var s2 = 0; s2 <= sched.total; s2 += rec) {
+      var temp = sched.T(s2);
+      var frac = U.clamp((p.Tm + 60 - temp) / 120, 0, 1);
+      timeline.push({ t: s2, T: temp, X: Xm * frac });
+    }
+    return {
+      U: cand.volFrac / 0.012, X: Xm, Xeq: 1, metal: true,
+      curve: [{ T: p.Tm + 40, logt: 12 }, { T: p.Tm + 1, logt: -0.4 }],
+      best: { T: p.Tm, tn: 0, margin: 9, tRes: 0 }, sizeMm: sm,
+      Q: 0, tBelow: 0, tBest: 0, Tbest: p.Tm, timeline: timeline
+    };
+  }
+
+  var Q = 280000 + 120000 * U.clamp(1 - comp.nboT / 1.2, 0, 1);
+  var tau0 = 8e-12;
+  var surf = 1 + 4 * (p.surface || 0.3);
+  var Tm = cand.TmEff;
+  var seeded = cand.undissolved;
+
+  /* Equilibrium crystallinity.
+   * Only the fraction of the melt that is *supersaturated* can precipitate:
+   * excess = 1 - 1/sat. A phase sitting at its threshold gets nothing; a phase
+   * at three times its threshold precipitates most of its own oxide. This is
+   * the lever rule doing the job an activity model would do. */
+  /* effective arrest temperature: the melt keeps crystallising as it cools, but
+     stops making progress once it is stiff (~800 C). Weight the hold and the
+     cooling leg equally. */
+  var Tend = Math.sqrt(((firing.holdC || 950) + 273) * 1123);
+  var excess = U.clamp(1 - 1 / cand.sat, 0, 0.92);
+  var thermal = U.clamp((Tm - Tend) / (Tm * 0.5), 0, 1);
+  var Xeq = excess * (0.35 + 0.65 * thermal);
+
+  function tNeeded(T) {
+    var dT = Tm - T;
+    if (dT <= 1) return Infinity;
+    /* seeded phases have no nucleation barrier: their TTT is growth-limited and
+       nearly straight. Unseeded phases get the full C-shaped curve. */
+    var tnuc = seeded ? 0 : tau0 * Math.exp(Q / (R_GAS * T)) * Math.pow(Tm / dT, 1.5) / (cand.nucleo * surf);
+    var DF = U.clamp(1 - Math.exp(-(p.dHf * dT) / (R_GAS * T * Tm)), 0, 1);
+    var D = 1e-2 * Math.exp(-0.75 * Q / (R_GAS * T));
+    var Ug = U.clamp(D / 1e-6 * DF, 1e-12, 5e-4);          // m/s
+    return tnuc + 1e-5 / Ug;                                 // 10 um to become visible
+  }
+
+  var curve = [];
+  for (var T = Math.min(Tm + 40, 1750); T >= 700; T -= 10) {
+    var t = tNeeded(T);
+    curve.push({ T: T, logt: !isFinite(t) ? 12 : U.clamp(Math.log10(t), -2, 12) });
+  }
+
+  var supply = Math.pow(U.clamp(cand.volFrac / 0.03, 0.04, 1), 0.5);
+  var Uacc = 0, best = { margin: -99 }, tBelow = 0, dt = 10;
+  var rec = Math.max(10, Math.floor(sched.total / 360));
+  var timeline = [];
+  var nextRec = 0;
+  for (var s = 0; s < sched.total; s += dt) {
+    var temp = sched.T(s);
+    if (temp > Tm) continue;
+    if (temp < 700) break;
+    var tn = tNeeded(temp);
+    if (!isFinite(tn)) continue;
+    Uacc += dt / tn;
+    tBelow += dt;
+    if (s >= nextRec) {
+      timeline.push({ t: s, T: temp, X: Xeq * (1 - Math.exp(-Uacc)) * supply });
+      nextRec = s + rec;
+    }
+    var margin = Math.log10(dt) - Math.log10(tn);
+    if (margin > best.margin) best = { margin: margin, T: temp, tn: tn, tRes: dt };
+  }
+  timeline.push({ t: sched.total, T: 25, X: Xeq * (1 - Math.exp(-Uacc)) * supply });
+
+  var X = Xeq * (1 - Math.exp(-Uacc)) * supply;
+
+  var Tb = best.T || Tm - 60;
+  var dTb = Math.max(Tm - Tb, 5);
+  var DFb = U.clamp(1 - Math.exp(-(p.dHf * dTb) / (R_GAS * Tb * Tm)), 0, 1);
+  var Db = 1e-2 * Math.exp(-0.75 * Q / (R_GAS * Tb));
+  var Ub = U.clamp(Db / 1e-6 * DFb, 0, 5e-4);
+  var tGrow = Math.min(tBelow, sched.hasHold ? 7200 : 3600);
+  var sizeMm = U.clamp(Ub * tGrow * 1000, 0.002, 3.5);
+
+  return {
+    U: Uacc, X: X, Xeq: Xeq, supply: supply, curve: curve, best: best,
+    sizeMm: sizeMm, Q: Q, tBelow: tBelow, tBest: best.tn || Infinity,
+    Tbest: best.T || null, seeded: seeded, timeline: timeline
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 6. optics
+ * ------------------------------------------------------------------ */
+var STRENGTH = {
+  CoO: 4.5, CuO: 9.0, Fe2O3: 0.42, FeO: 0.42, MnO: 2.6, Cr2O3: 9.0, NiO: 2.5,
+  V2O5: 2.5, UO3: 1.5, Nd2O3: 1.6, Pr6O11: 1.6, Er2O3: 1.8, CeO2: 0.2,
+  Ag2O: 4.0, Au2O3: 4.0, TiO2: 0.02, SnO2: 0.0, ZrO2: 0.0, Bi2O3: 0.02, CdO: 3.0
+};
+
+function speciesOf(el, spec) {
+  var e = spec.elements.filter(function (x) { return x.el === el; })[0];
+  if (!e) return null;
+  var r = e.reducedFrac;
+  var map = {
+    Cu: [['Cu2+', 1 - r], ['Cu0', r * 0.62], ['Cu+', r * 0.38]],
+    Fe: [['Fe3+', 1 - r], ['Fe2+', r]],
+    Bi: [['Bi3+', 1 - r]],
+    Mn: [['Mn3+', 1 - r], ['Mn2+', r]],
+    Cr: [['Cr3+', 1 - r]],
+    Ti: [['Ti4+', 1], ['Ti3+', r]],
+    Ag: [['Ag0', r]],
+    Ni: [['Ni2+', 1]], Co: [['Co2+', 1]],
+    V: [['V5+', 1 - r], ['V4+', r]],
+    U: [['U6+', 1 - r], ['U5+', r]],
+    Nd: [['Nd3+', 1]], Pr: [['Pr3+', 1]], Er: [['Er3+', 1]], Cd: [['Cd2+', 1]]
+  };
+  return map[el] || null;
+}
+
+var TINT = {
+  magnetite: '#191a1e', hematite: '#6a2b1d', cuprite: '#7d1b12', tenorite: '#16130f',
+  chromite: '#16180f', hausmannite: '#2b1e13', zincferrite: '#2f2017',
+  willemite: '#efebe2', zincite: '#f2efe8', rutile: '#e9dfc9', cassiterite: '#f3f0ea',
+  zircon: '#f2f0ea', corundum: '#eeece6', anorthite: '#efece5', wollastonite: '#f0ede6',
+  diopside: '#e9ece2', celsian: '#f0ede6', leucite: '#efece4', nepheline: '#efece4',
+  spodumene: '#efece4', lidisilicate: '#efece4', quartz: '#f0eee8', cristobalite: '#f0eee8',
+  apatite: '#f1eee7', mullite: '#efece4', gahnite: '#eeeae6', spinel: '#f0ece4',
+  thenardite: '#1c2a6e', bismuthoxide: '#e6cf74', eulytite: '#efe2a8', sillenite: '#f0e6b0',
+  cerianite: '#f0ead8', baddeleyite: '#f2f0ea', bismuth: '#c9c9cc', copper: '#b0553c',
+  silver: '#dfe0e2'
+};
+
+var DARK = {
+  magnetite: 1.7, hematite: 1.4, cuprite: 1.3, tenorite: 1.6, chromite: 1.6,
+  hausmannite: 1.4, zincferrite: 1.3, thenardite: 1.2, bismuthoxide: 1.0
+};
+function tintWeight(id) {
+  if (DARK[id]) return DARK[id];
+  return 0.30;                      // transparent silicates mostly add haze, not hue
+}
+function hexToRgb(h) {
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+}
+function mix(a, b, t) {
+  return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)];
+}
+
+function optics(comp, spec, ranked, firing) {
+  var absorbers = [];
+  var lost = {};
+
+  ranked.forEach(function (r) {
+    if (r.phase.kind === 'metal' && r.X > 0.08) {
+      var el = GC.OXIDES[Object.keys(r.phase.req)[0]].cat[0].el;
+      lost[el] = (lost[el] || 0) + Math.min(0.95, r.X);
+    }
+  });
+
+  Object.keys(comp.mass).forEach(function (ox) {
+    var o = GC.OXIDES[ox];
+    if (!o) return;
+    var wt = comp.mass[ox] / comp.totalMass * 100;
+    if (wt < 0.004) return;
+    var st = STRENGTH[ox];
+    if (!st) return;
+    o.cat.forEach(function (c) {
+      var sp = speciesOf(c.el, spec);
+      if (!sp) return;
+      var keep = 1 - (lost[c.el] || 0);
+      sp.forEach(function (pair) {
+        if (pair[1] <= 0) return;
+        absorbers.push({ species: pair[0], strength: wt * st * pair[1] * keep });
+      });
+    });
+  });
+
+  var scatters = [];
+  ranked.forEach(function (r) {
+    if (r.X <= 0.03 || r.volFrac <= 0.002 || r.phase.kind === 'metal') return;
+    if (r.phase.n < 1.55) return;
+    scatters.push({ r: Math.max(r.sizeMm * 1e-3 / 2, 2e-8), phi: Math.min(0.4, r.X * r.volFrac), n: r.phase.n });
+  });
+
+  var metalPhase = ranked.filter(function (r) {
+    return r.phase.kind === 'metal' && r.visible && r.X > 0.12;
+  })[0];
+
+  var coolF = { fast: 0.25, normal: 0.55, slow: 0.85, vslow: 1.0 }[firing.cooling] || 0.55;
+  var filmNm = 25 + 95 * coolF;
+
+  var app;
+  if (metalPhase) {
+    var mt = metalPhase.phase.id === 'copper' ? 'Cu' : metalPhase.phase.id === 'silver' ? 'Ag' : 'Bi';
+    app = GC.color.appearance({ metal: { type: mt, filmNm: filmNm, nFilm: 2.1 } });
+    app.metalPhase = metalPhase;
+    app.filmNm = filmNm;
+  } else {
+    app = GC.color.appearance({ absorbers: absorbers, scatters: scatters });
+  }
+  /* crystals on the surface contribute their own colour, not just haze */
+  var hasChrome = (comp.mass.Cr2O3 || 0) > 0.0005;
+  var coverage = 0;
+  if (!metalPhase) {
+    var wsum = 0, acc = [0, 0, 0];
+    ranked.forEach(function (r) {
+      if (!r.visible || r.X < 0.05 || r.volFrac < 0.002) return;
+      var w = U.clamp(r.X * r.volFrac / 0.04 * tintWeight(r.phase.id), 0, 1.4);
+      if (w <= 0.01) return;
+      var hex = TINT[r.phase.id] || '#eeeae4';
+      if (r.phase.id === 'cassiterite' && hasChrome && (spec.species['Cr3+'] || 0) > 0.3) { hex = '#d98ba8'; w = U.clamp(w * 9, 0.55, 0.88); }
+      if (r.phase.id === 'rutile' && (spec.species['Fe2+'] || 0) > 0.3) { hex = '#6f7f97'; w = U.clamp(w * 5, 0.30, 0.80); }
+      var c = hexToRgb(hex);
+      acc[0] += c[0] * w; acc[1] += c[1] * w; acc[2] += c[2] * w;
+      wsum += w;
+    });
+    if (wsum > 0.01) {
+      var avg = [acc[0] / wsum, acc[1] / wsum, acc[2] / wsum];
+      app.rgb = mix(app.rgb, avg, U.clamp(wsum, 0, 0.93));
+      coverage = U.clamp(wsum, 0, 1);
+    }
+    app.rgb = app.rgb.map(function (v) { return U.clamp(v, 0, 255); });
+  }
+  app.coverage = U.clamp(coverage, 0, 1);
+  app.matte = U.clamp(coverage * 0.9 + scatters.reduce(function (s2, x) { return s2 + x.phi * 2; }, 0), 0, 1);
+  app.absorbers = absorbers;
+  app.scatters = scatters;
+  app.name = app.kind === 'metal'
+    ? (metalPhase.phase.id === 'bismuth' ? 'iridescent bismuth' : 'metallic ' + metalPhase.phase.id)
+    : GC.color.colourName(app.rgb);
+  app.hex = GC.color.toHex(app.rgb);
+  return app;
+}
+
+/* ------------------------------------------------------------------ *
+ * 7. predict
+ * ------------------------------------------------------------------ */
+function predict(recipe, firing) {
+  var comp = compose(recipe);
+  var spec = speciate(comp, firing);
+  var sched = buildSchedule(firing);
+  var cands = candidates(comp, spec, sched);
+  var volGlaze = comp.totalMass / 2.6;
+
+  var ranked = cands.map(function (c) {
+    var k = kinetics(c, comp, sched, firing);
+    return {
+      phase: c.phase, X: k.X, Xeq: k.Xeq, U: k.U, volFrac: c.volFrac, TmEff: c.TmEff,
+      sat: c.sat, undissolved: c.undissolved, sizeMm: k.sizeMm, curve: k.curve,
+      best: k.best, supply: k.supply, Q: k.Q, limiting: c.limiting, tBelow: k.tBelow,
+      tBest: k.tBest, Tbest: k.Tbest, timeline: k.timeline || null,
+      capacity: c.capacity, req: c.phase.req, seeded: !!k.seeded
+    };
+  }).filter(function (r) { return r.X > 0.02; })
+    .sort(function (a, b) { return b.X - a.X; });
+
+  /* sequential depletion: earlier phases eat the shared oxides */
+  var pool = pools(comp, spec);
+  ranked.forEach(function (r) {
+    var cap = Infinity;
+    Object.keys(r.req).forEach(function (k) {
+      var a = (pool[k] || 0) / r.req[k];
+      if (a < cap) cap = a;
+    });
+    var frac = r.capacity > 0 ? Math.min(1, cap / r.capacity) : 0;
+    r.X *= frac;
+    r.volFrac *= frac;
+    Object.keys(r.req).forEach(function (k) {
+      pool[k] = Math.max(0, (pool[k] || 0) - cap * r.req[k]);
+    });
+    r.visible = r.phase.kind !== 'metal' || r.volFrac >= 0.005;
+  });
+  ranked = ranked.filter(function (r) { return r.X > 0.02; })
+    .sort(function (a, b) { return b.X - a.X; });
+
+  var app = optics(comp, spec, ranked, firing);
+
+  var warnings = [];
+  var dCte = comp.cte - 62;
+  if (dCte > 38) warnings.push({ level: 'high', text: 'Expansion is ~' + Math.round(comp.cte) + 'e-7/C against a stoneware body (~62). The glaze will sit in tension: crazing is likely.' });
+  else if (dCte < -18) warnings.push({ level: 'med', text: 'Glaze expansion well below the body: shivering / dunting risk on rims.' });
+  if ((comp.unity.Bi2O3 || 0) > 0.05) warnings.push({ level: 'info', text: 'Bi2O3 at ' + comp.unity.Bi2O3.toFixed(2) + ' unity is a heavy-metal flux with the same lone-pair chemistry as PbO. Far lower oral toxicity than lead, but a metallic bismuth surface is still not a food surface.' });
+  if ((comp.unity.PbO || 0) > 0.02) warnings.push({ level: 'high', text: 'Lead in the formula. No food contact without a leach test.' });
+  if (app.kind === 'metal') warnings.push({ level: 'med', text: 'A metallic bismuth / copper / silver surface oxidises and is not dishwasher- or food-safe.' });
+  if (comp.nboT > 1.0) warnings.push({ level: 'med', text: 'Very depolymerised melt (NBO/T ' + comp.nboT.toFixed(2) + '): expect running and possible crawling.' });
+  var vis = ranked.filter(function (r) { return r.visible; });
+  if (vis.length && vis[0].phase.id === 'cristobalite') warnings.push({ level: 'med', text: 'Cristobalite has a big thermal expansion mismatch with the body; a thick cristobalite skin is a classic cause of late crazing.' });
+
+  var verdict = buildVerdict(ranked, app, comp, spec);
+
+  return {
+    comp: comp, spec: spec, sched: sched, ranked: ranked, optics: app,
+    warnings: warnings, verdict: verdict, firing: firing
+  };
+}
+
+function buildVerdict(ranked, app, comp, spec) {
+  var vis = ranked.filter(function (r) { return r.visible; });
+  if (!vis.length || vis[0].X < 0.08) {
+    var sat = app.absorbers.reduce(function (m, a) { return Math.max(m, a.strength); }, 0);
+    var chrom = app.absorbers.length ? app.absorbers[0].species.replace(/[0-9+].*$/, '') : '';
+    return {
+      headline: sat > 0.35 ? 'Glassy ' + app.name + ' — no crystal wins' : 'Glassy. No crystal wins.',
+      detail: 'No phase reaches its liquidus and then actually nucleates in the time available, so the surface freezes as a supercooled glass. The look is set by the dissolved ' +
+        (chrom ? chrom : 'colourants') + ', not by crystals.',
+      kind: 'glass'
+    };
+  }
+  var d = vis[0], p = d.phase;
+  var metal = p.kind === 'metal';
+  return {
+    headline: (metal ? 'Metallic ' + (p.id === 'bismuth' ? 'bismuth' : p.id) : p.name) +
+      ' — ' + p.system + ' ' + (metal ? 'hopper' : p.shape) + ' habit',
+    detail: p.note,
+    kind: metal ? 'metal' : 'crystal',
+    phase: p,
+    amount: d.X,
+    secondary: vis.slice(1, 3).map(function (r) { return { name: r.phase.name, X: r.X }; })
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * 8. "what would change it"
+ * ------------------------------------------------------------------ */
+function explore(recipe, firing) {
+  var base = predict(recipe, firing);
+  var vis = base.ranked.filter(function (r) { return r.visible; });
+  var baseTop = vis.length ? vis[0].phase.id : 'glass';
+  var baseX = vis.length ? vis[0].X : 0;
+  var out = [];
+
+  function run(label, fir) {
+    var r = predict(recipe, fir);
+    var v = r.ranked.filter(function (x) { return x.visible; });
+    var top = v[0];
+    out.push({
+      label: label,
+      top: top ? top.phase.id : 'glass',
+      topName: top ? top.phase.name : 'glass',
+      X: top ? top.X : 0,
+      changed: (top ? top.phase.id : 'glass') !== baseTop,
+      delta: (top ? top.X : 0) - baseX,
+      headline: r.verdict.headline
+    });
+  }
+
+  run(firing.atmosphere === 'ox' ? 'Fire in reduction' : 'Fire in oxidation',
+    Object.assign({}, firing, { atmosphere: firing.atmosphere === 'ox' ? 'red' : 'ox' }));
+  run('Cool one step slower', Object.assign({}, firing, {
+    cooling: firing.cooling === 'fast' ? 'normal' : firing.cooling === 'normal' ? 'slow' : 'vslow'
+  }));
+  run('+45 min soak at ' + Math.round(firing.holdC || firing.peakC) + ' C',
+    Object.assign({}, firing, { holdMin: (firing.holdMin || 0) + 45 }));
+  run('+1 cone peak', Object.assign({}, firing, { peakC: firing.peakC + 25 }));
+
+  return { base: base, variants: out };
+}
+
+GC.engine = {
+  compose: compose, speciate: speciate, pools: pools, buildSchedule: buildSchedule,
+  candidates: candidates, kinetics: kinetics, optics: optics,
+  predict: predict, explore: explore, CRIT: CRIT, KD: KD, TINT: TINT, DARK: DARK
+};
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* GLAZECAST — presets: real, recognisable glaze behaviours used as both
+ * starting points and regression cases.
+ */
+(function (root) {
+'use strict';
+var GC = root.GC = root.GC || {};
+
+function R(a) { return a.map(function (x) { return { id: x[0], wt: x[1] }; }); }
+
+GC.PRESETS = [
+  {
+    id: 'bi-red',
+    name: 'Bismuth, reduced',
+    tag: 'the video',
+    blurb: 'Cone 6, reduction, slow cool. Bi2O3 reduces to metal; the metal beads, freezes as trigonal hopper plates, and tarnishes to a thin oxide film that interferes in colour.',
+    recipe: R([['custer',30],['silica',20],['whiting',15],['kaolin',15],['frit3134',15],['zinc',5],['bismuth',6]]),
+    firing: { cone:'6', peakC:1222, atmosphere:'red', cooling:'slow', holdC:1100, holdMin:60, soakMin:10 }
+  },
+  {
+    id: 'bi-ox',
+    name: 'Bismuth, oxidised',
+    tag: 'the control',
+    blurb: 'Same recipe, clean air. No metal: Bi3+ stays a lone-pair flux, stiffening the melt and tinting it faintly. This is the experiment most people run first and conclude "bismuth does nothing".',
+    recipe: R([['custer',30],['silica',20],['whiting',15],['kaolin',15],['frit3134',15],['zinc',5],['bismuth',6]]),
+    firing: { cone:'6', peakC:1222, atmosphere:'ox', cooling:'slow', holdC:1100, holdMin:60, soakMin:10 }
+  },
+  {
+    id: 'zinc-crystal',
+    name: 'Zinc crystalline',
+    tag: 'willemite',
+    blurb: '25% ZnO and a long hold at 1100 C. Willemite nucleates at the free surface and grows inward as radiating spherulites.',
+    recipe: R([['custer',20],['silica',20],['whiting',10],['kaolin',10],['zinc',25],['frit3134',15]]),
+    firing: { cone:'6', peakC:1222, atmosphere:'ox', cooling:'vslow', holdC:1100, holdMin:90, soakMin:10 }
+  },
+  {
+    id: 'tenmoku',
+    name: 'Tenmoku',
+    tag: 'Fe3O4',
+    blurb: 'Cone 10, reduction. Iron drops to Fe2+, magnetite exsolves on cooling, and the surface goes black with a metallic sheen that breaks to rust on the edges.',
+    recipe: R([['custer',30],['silica',25],['whiting',15],['kaolin',10],['ironred',10],['dolomite',5],['bentonite',2]]),
+    firing: { cone:'10', peakC:1305, atmosphere:'red', cooling:'slow', holdC:1150, holdMin:30, soakMin:10 }
+  },
+  {
+    id: 'copper-red',
+    name: 'Copper red',
+    tag: 'colloid',
+    blurb: '0.5% CuO, heavy reduction, fast cool. Copper metal condenses as 10-40 nm colloids whose plasmon absorption eats green and leaves ruby.',
+    recipe: R([['custer',30],['silica',25],['whiting',15],['kaolin',10],['frit3134',10],['zinc',5],['coppercarb',0.5]]),
+    firing: { cone:'10', peakC:1305, atmosphere:'hred', cooling:'fast', holdC:1150, holdMin:0, soakMin:10 }
+  },
+  {
+    id: 'chrome-tin',
+    name: 'Chrome-tin pink',
+    tag: 'pigment',
+    blurb: 'Cr3+ substituted into cassiterite, charge-balanced by Ca. Needs oxidation: reduce it and the pink turns muddy green.',
+    recipe: R([['custer',30],['silica',22],['whiting',18],['kaolin',12],['tin',8],['chrome',0.3],['zinc',5]]),
+    firing: { cone:'6', peakC:1222, atmosphere:'ox', cooling:'normal', holdC:1100, holdMin:20, soakMin:10 }
+  },
+  {
+    id: 'rutile-blue',
+    name: 'Rutile blue',
+    tag: 'needles',
+    blurb: 'Raw rutile never dissolves at cone 6, so it seeds itself. In reduction the Ti-Fe pair tints the needles blue-grey; in oxidation you get cream.',
+    recipe: R([['custer',30],['silica',22],['whiting',14],['kaolin',12],['rutile',6],['ironred',2],['zinc',4]]),
+    firing: { cone:'6', peakC:1222, atmosphere:'red', cooling:'slow', holdC:1100, holdMin:30, soakMin:10 }
+  },
+  {
+    id: 'clear',
+    name: 'Cone 6 clear',
+    tag: 'baseline',
+    blurb: 'A well-behaved glossy base. Nothing saturates, nothing nucleates: the useful null result.',
+    recipe: R([['custer',30],['silica',20],['whiting',15],['kaolin',15],['frit3134',15],['zinc',5]]),
+    firing: { cone:'6', peakC:1222, atmosphere:'ox', cooling:'normal', holdC:1100, holdMin:0, soakMin:10 }
+  }
+];
+
+GC.PRESET_BY_ID = {};
+GC.PRESETS.forEach(function (p) { GC.PRESET_BY_ID[p.id] = p; });
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* GLAZECAST — drawing: the simulated surface and the TTT diagram.
+ * Everything here is driven by the engine's numbers, not by canned art.
+ */
+(function (root) {
+'use strict';
+var GC = root.GC = root.GC || {};
+
+/* ---------------- tiny value noise --------------------------------------- */
+function hash2(x, y) {
+  var h = x * 374761393 + y * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+}
+function vnoise(x, y) {
+  var xi = Math.floor(x), yi = Math.floor(y);
+  var xf = x - xi, yf = y - yi;
+  var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  var a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function fbm(x, y, oct) {
+  var s = 0, a = 0.5, f = 1;
+  for (var i = 0; i < (oct || 4); i++) { s += a * vnoise(x * f, y * f); f *= 2.07; a *= 0.5; }
+  return s;
+}
+function rnd(seed) {
+  var s = seed;
+  return function () { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function mixRGB(a, b, t) {
+  return [Math.round(lerp(a[0], b[0], t)), Math.round(lerp(a[1], b[1], t)), Math.round(lerp(a[2], b[2], t))];
+}
+function rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+
+/* ---------------- iridescent background ---------------------------------- */
+function iridescentFill(ctx, W, H, metal, filmNm) {
+  var pal = GC.color.iridescentPalette(metal, 2.1);
+  var scale = 0.62;
+  var w = Math.max(80, Math.floor(W * scale)), h = Math.max(60, Math.floor(H * scale));
+  var img = ctx.createImageData(w, h);
+  var d = img.data;
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      var n = fbm(x / 26, y / 26, 4) * 0.62 + fbm(x / 7, y / 7, 2) * 0.38;
+      n = Math.min(1, Math.max(0, (n - 0.16) / 0.62));
+      var film = 48 + n * 250;
+      var idx = Math.min(pal.length - 1, Math.max(0, Math.round(film / 10)));
+      var c = pal[idx].rgb;
+      var grey = (c[0] + c[1] + c[2]) / 3;
+      var sat = 2.2;
+      var light = 0.70 + 0.30 * fbm(x / 70 + 5, y / 70 + 5, 3);
+      var i = (y * w + x) * 4;
+      d[i] = Math.min(255, (grey + (c[0] - grey) * sat) * light);
+      d[i + 1] = Math.min(255, (grey + (c[1] - grey) * sat) * light);
+      d[i + 2] = Math.min(255, (grey + (c[2] - grey) * sat) * light);
+      d[i + 3] = 255;
+    }
+  }
+  var tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  tmp.getContext('2d').putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(tmp, 0, 0, W, H);
+}
+
+/* ---------------- crystal shapes ----------------------------------------- */
+function drawTriangle(ctx, x, y, r, rot, base, rim) {
+  /* one faceted plate: bright upper-left face, dark lower-right, concentric
+     ridge lines for the hopper steps */
+  function tri(rr, dx, dy) {
+    ctx.beginPath();
+    for (var k = 0; k < 3; k++) {
+      var a = rot + k * Math.PI * 2 / 3;
+      var px = x + dx + Math.cos(a) * rr;
+      var py = y + dy + Math.sin(a) * rr;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+  tri(r, 0, 0);
+  var g = ctx.createLinearGradient(x - r * 0.75, y - r * 0.9, x + r * 0.55, y + r * 0.95);
+  g.addColorStop(0, rgba(mixRGB(base, [255, 255, 255], 0.72), 1));
+  g.addColorStop(0.28, rgba(mixRGB(base, [255, 250, 240], 0.30), 1));
+  g.addColorStop(0.60, rgba(mixRGB(base, [150, 154, 168], 0.35), 1));
+  g.addColorStop(1, rgba(mixRGB(base, [28, 32, 44], 0.78), 1));
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = Math.max(1, r * 0.03);
+  ctx.stroke();
+
+  /* ridges */
+  for (var i = 1; i <= 2; i++) {
+    var rr = r * (1 - i * 0.3);
+    var dx = Math.cos(rot + 2.2) * r * 0.045 * i;
+    var dy = Math.sin(rot + 2.2) * r * 0.045 * i;
+    tri(rr, dx, dy);
+    ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+    ctx.lineWidth = Math.max(0.7, r * 0.016);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(20,24,32,0.30)';
+    ctx.lineWidth = Math.max(0.6, r * 0.012);
+    ctx.stroke();
+  }
+}
+
+function drawSpherulite(ctx, x, y, r, tint, rndf) {
+  var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, rgba(mixRGB(tint, [255, 255, 255], 0.72), 0.98));
+  g.addColorStop(0.45, rgba(mixRGB(tint, [255, 250, 240], 0.25), 0.9));
+  g.addColorStop(0.82, rgba(mixRGB(tint, [150, 138, 118], 0.45), 0.45));
+  g.addColorStop(1, rgba(mixRGB(tint, [120, 110, 95], 0.5), 0.05));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = rgba(mixRGB(tint, [90, 82, 70], 0.55), 0.45);
+  ctx.lineWidth = 0.7;
+  for (var i = 0; i < 46; i++) {
+    var a = (i / 46) * Math.PI * 2 + rndf() * 0.2;
+    var r0 = r * (0.08 + rndf() * 0.2), r1 = r * (0.72 + rndf() * 0.28);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
+    ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
+    ctx.stroke();
+  }
+}
+
+function drawNeedles(ctx, x, y, r, tint, rot, rndf) {
+  var n = 3 + Math.floor(rndf() * 4);
+  for (var i = 0; i < n; i++) {
+    var a = rot + (rndf() - 0.5) * 1.1;
+    var len = r * (0.6 + rndf() * 0.8);
+    var wid = Math.max(0.9, r * 0.06);
+    ctx.save();
+    ctx.translate(x + (rndf() - 0.5) * r * 0.5, y + (rndf() - 0.5) * r * 0.5);
+    ctx.rotate(a);
+    var g = ctx.createLinearGradient(0, 0, len, 0);
+    g.addColorStop(0, rgba(mixRGB(tint, [255, 255, 255], 0.4), 0.9));
+    g.addColorStop(1, rgba(tint, 0.45));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -wid); ctx.lineTo(len, -wid * 0.25); ctx.lineTo(len, wid * 0.25); ctx.lineTo(0, wid);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawOctahedron(ctx, x, y, r, rot, tint) {
+  var v = [];
+  for (var k = 0; k < 6; k++) {
+    var a = rot + k * Math.PI / 3;
+    v.push([x + Math.cos(a) * r, y + Math.sin(a) * r * 0.96]);
+  }
+  var facets = [
+    [[0, 1, 2], 0.42],
+    [[0, 2, 3], 0.16],
+    [[0, 3, 4], -0.28],
+    [[0, 4, 5], -0.10]
+  ];
+  for (var i = 0; i < facets.length; i++) {
+    var f = facets[i];
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (var j = 0; j < f[0].length; j++) ctx.lineTo(v[f[0][j]][0], v[f[0][j]][1]);
+    ctx.closePath();
+    var lift = f[1];
+    ctx.fillStyle = lift >= 0
+      ? rgba(mixRGB(tint, [255, 255, 255], 0.10 + lift), 1)
+      : rgba(mixRGB(tint, [30, 32, 40], -lift * 1.6), 1);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  for (var k2 = 0; k2 < 6; k2++) {
+    if (k2 === 0) ctx.moveTo(v[0][0], v[0][1]); else ctx.lineTo(v[k2][0], v[k2][1]);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = Math.max(0.7, r * 0.045);
+  ctx.stroke();
+}
+
+function drawPoly(ctx, x, y, r, sides, rot, tint) {
+  ctx.beginPath();
+  for (var k = 0; k <= sides; k++) {
+    var a = rot + k * Math.PI * 2 / sides;
+    var px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.86;
+    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  var g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  g.addColorStop(0, rgba(mixRGB(tint, [255, 255, 255], 0.55), 0.95));
+  g.addColorStop(0.6, rgba(tint, 0.9));
+  g.addColorStop(1, rgba(mixRGB(tint, [70, 64, 58], 0.35), 0.85));
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = rgba(mixRGB(tint, [255, 255, 255], 0.6), 0.5);
+  ctx.lineWidth = 0.8; ctx.stroke();
+}
+
+/* ---------------- the surface -------------------------------------------- */
+/* Crystal instances are generated once per prediction (normalised coords), so
+   a time slider can grow the same crystals in place instead of re-rolling. */
+function buildCrystalSet(pred, W, H, pxPerMm) {
+  if (pred._crystals) return pred._crystals;
+
+  var hash = 0;
+  try {
+    JSON.stringify([pred.firing, pred.comp.mass]).split('').forEach(function (ch) {
+      hash = (hash * 31 + ch.charCodeAt(0)) % 1000000007;
+    });
+  } catch (e) { /* keep 0 */ }
+  var rndf = rnd(12345 + hash);
+  var out = { crystals: [], metal: [], glassRGB: null };
+
+  var app = pred.optics;
+  var vis = pred.ranked.filter(function (r) { return r.visible && r.X > 0.06; });
+
+  vis.slice(0, 3).forEach(function (ph, rank) {
+    var p = ph.phase;
+    var tint = hexToRgb(GC.engine.TINT[p.id] || '#efeae0');
+    var hasChrome = (pred.comp.mass.Cr2O3 || 0) > 0.0005;
+    if (p.id === 'cassiterite' && hasChrome) tint = hexToRgb('#d98ba8');
+    if (p.id === 'rutile' && (pred.spec.species['Fe2+'] || 0) > 0.3) tint = hexToRgb('#6f7f97');
+
+    var area = Math.min(0.85, ph.X * ph.volFrac * 14);
+    var count = Math.round(4 + 90 * area * (rank === 0 ? 1 : 0.5));
+    var sizeMm = ph.sizeMm * (0.6 + 0.8 / (1 + rank));
+
+    /* birth time: the moment the k-th crystal's growth fraction is reached */
+    var tl = ph.timeline || [];
+    var Xf = ph.X || 1;
+    for (var k = 0; k < count; k++) {
+      var target = (k + 0.5) / count * Xf;
+      var birth = 0;
+      for (var i = 0; i < tl.length; i++) {
+        if (tl[i].X >= target) { birth = tl[i].t; break; }
+        birth = tl[i].t;
+      }
+      var inst = {
+        phIdx: rank, p: p, shape: p.shape, tint: tint, rank: rank,
+        nx: rndf(), ny: rndf(),
+        rMm: sizeMm * (0.4 + rndf() * 0.9),
+        rot: rndf() * Math.PI * 2,
+        birth: birth
+      };
+      if (p.kind === 'metal') out.metal.push(inst); else out.crystals.push(inst);
+    }
+  });
+
+  if (app.kind === 'metal') {
+    var g = GC.color.appearance({ absorbers: app.absorbers || [], scatters: [] });
+    out.glassRGB = g.rgb;
+  }
+  pred._crystals = out;
+  return out;
+}
+
+function growthFrac(inst, ph, t) {
+  /* interpolate the phase's accumulation profile at time t */
+  var tl = ph.timeline || [];
+  if (!tl.length) return 1;
+  if (t >= tl[tl.length - 1].t) return 1;
+  for (var i = 0; i < tl.length - 1; i++) {
+    if (t <= tl[i + 1].t) {
+      var f = (t - tl[i].t) / Math.max(1, tl[i + 1].t - tl[i].t);
+      return GC.util.clamp(tl[i].X + f * (tl[i + 1].X - tl[i].X), 0, 1);
+    }
+  }
+  return 1;
+}
+
+function surface(canvas, pred) { return surfaceAt(canvas, pred, null); }
+
+function surfaceAt(canvas, pred, t) {
+  if (!canvas) return;
+  var dpr = Math.min(2, root.devicePixelRatio || 1);
+  var W = canvas.clientWidth || 640, H = canvas.clientHeight || 420;
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  var app = pred.optics;
+  var pxPerMm = W / 24;
+  var timed = t !== null && t !== undefined && isFinite(t);
+  var set = buildCrystalSet(pred, W, H, pxPerMm);
+
+  if (app.kind === 'metal') {
+    /* the oxide film builds up while the piece cools; before that, glass */
+    var fade = timed ? GC.util.clamp((pred.firing.peakC - pred.sched.T(t)) / 240, 0, 1) : 1;
+    if (fade < 1 && set.glassRGB) {
+      ctx.fillStyle = rgba(set.glassRGB, 1);
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (fade > 0.02) {
+      ctx.save();
+      ctx.globalAlpha = fade;
+      iridescentFill(ctx, W, H, 'Bi', app.filmNm || 90);
+      ctx.restore();
+    }
+
+    set.metal.forEach(function (inst) {
+      var ph = pred.ranked[inst.phIdx];
+      if (!ph) return;
+      var f = timed ? growthFrac(inst, ph, t) : 1;
+      if (f <= 0.01) return;
+      var x = inst.nx * W, y = inst.ny * H;
+      var r = Math.max(2, inst.rMm * pxPerMm * (0.25 + 0.75 * f));
+      var rot = inst.rot;
+      ctx.save();
+      ctx.globalAlpha = GC.util.clamp(f * 2.4, 0, 1);
+      ctx.translate(x + r * 0.10, y + r * 0.13);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      for (var kk = 0; kk < 3; kk++) {
+        var aa = kk * Math.PI * 2 / 3;
+        var px = Math.cos(aa) * r, py = Math.sin(aa) * r;
+        if (kk === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(6,8,14,0.42)';
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = GC.util.clamp(f * 2.4, 0, 1);
+      drawTriangle(ctx, x, y, r, rot, [222, 226, 234], 'rgba(255,250,242,0.9)');
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.30;
+      var ig = ctx.createLinearGradient(x - r * 0.5, y - r * 0.5, x + r * 0.4, y + r * 0.4);
+      ig.addColorStop(0, 'rgba(130,190,255,0.55)');
+      ig.addColorStop(0.5, 'rgba(255,255,255,0)');
+      ig.addColorStop(1, 'rgba(255,150,200,0.45)');
+      ctx.fillStyle = ig;
+      ctx.beginPath();
+      for (var kq = 0; kq < 3; kq++) {
+        var aq = rot + kq * Math.PI * 2 / 3;
+        var pxq = x + Math.cos(aq) * r * 0.98, pyq = y + Math.sin(aq) * r * 0.98;
+        if (kq === 0) ctx.moveTo(pxq, pyq); else ctx.lineTo(pxq, pyq);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    });
+  } else {
+    var base = app.rgb;
+    var g = ctx.createLinearGradient(0, 0, W * 0.2, H);
+    g.addColorStop(0, rgba(mixRGB(base, [255, 255, 255], 0.40), 1));
+    g.addColorStop(0.42, rgba(mixRGB(base, [255, 255, 255], 0.06), 1));
+    g.addColorStop(1, rgba(mixRGB(base, [44, 36, 28], 0.34), 1));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    var sp = ctx.createRadialGradient(W * 0.26, H * 0.16, 0, W * 0.26, H * 0.16, Math.max(W, H) * 0.8);
+    sp.addColorStop(0, 'rgba(255,255,255,0.34)');
+    sp.addColorStop(0.35, 'rgba(255,255,255,0.07)');
+    sp.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sp; ctx.fillRect(0, 0, W, H);
+
+    if ((app.matte || 0) < 0.5) {
+      ctx.save();
+      ctx.translate(W * 0.30, H * 0.24);
+      ctx.rotate(-0.42);
+      ctx.scale(1, 0.30);
+      var hg = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(W, H) * 0.55);
+      hg.addColorStop(0, 'rgba(255,255,255,' + (0.30 * (1 - (app.matte || 0) * 2)) + ')');
+      hg.addColorStop(0.55, 'rgba(255,255,255,0.06)');
+      hg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(0, 0, Math.min(W, H) * 0.55, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var d = img.data, cw = canvas.width, ch = canvas.height;
+    for (var yy = 0; yy < ch; yy += 2) {
+      for (var xx = 0; xx < cw; xx += 2) {
+        var i2 = (yy * cw + xx) * 4;
+        var n2 = fbm(xx / (cw * 0.09), yy / (ch * 0.09), 3) - 0.5;
+        var f2 = 1 + n2 * 0.22;
+        d[i2] = Math.min(255, d[i2] * f2);
+        d[i2 + 1] = Math.min(255, d[i2 + 1] * f2);
+        d[i2 + 2] = Math.min(255, d[i2 + 2] * f2);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    set.crystals.forEach(function (inst) {
+      var ph = pred.ranked[inst.phIdx];
+      if (!ph) return;
+      var f = timed ? growthFrac(inst, ph, t) : 1;
+      if (f <= 0.01) return;
+      var x2 = inst.nx * W, y2 = inst.ny * H;
+      var r2 = Math.max(2, inst.rMm * pxPerMm * (0.30 + 0.70 * f));
+      var rot2 = inst.rot;
+      var alpha = GC.util.clamp(f * 2.5, 0, 1) * (inst.rank === 0 ? 1 : 0.55);
+      var shape = inst.shape;
+      if (shape === 'spherulite') {
+        ctx.globalAlpha = 0.20 * alpha;
+        ctx.fillStyle = 'rgba(60,45,30,1)';
+        ctx.beginPath(); ctx.arc(x2 + r2 * 0.16, y2 + r2 * 0.2, r2 * 2.9, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.globalAlpha = 0.22 * alpha;
+        ctx.fillStyle = 'rgba(50,40,28,1)';
+        ctx.beginPath(); ctx.arc(x2 + r2 * 0.2, y2 + r2 * 0.26, r2 * 0.95, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = alpha;
+      if (shape === 'spherulite') drawSpherulite(ctx, x2, y2, r2 * 3.0, inst.tint, rnd(inst.nx * 999 + inst.ny * 777));
+      else if (shape === 'needle') drawNeedles(ctx, x2, y2, r2, inst.tint, rot2, rnd(inst.nx * 33 + inst.ny * 55));
+      else if (shape === 'octahedron') drawOctahedron(ctx, x2, y2, r2, rot2, inst.tint);
+      else if (shape === 'hex') drawPoly(ctx, x2, y2, r2, 6, rot2, inst.tint);
+      else if (shape === 'triangle') drawTriangle(ctx, x2, y2, r2, rot2, inst.tint, 'rgba(255,255,255,0.4)');
+      else drawPoly(ctx, x2, y2, r2, 5, rot2, inst.tint);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  /* glaze sheen + vignette */
+  var sheen = ctx.createLinearGradient(0, 0, W * 0.65, H);
+  var sheenA = (app.kind === 'metal' ? 0.07 : 0.15) * (1 - (app.matte || 0) * 0.8);
+  sheen.addColorStop(0, 'rgba(255,255,255,' + sheenA + ')');
+  sheen.addColorStop(0.45, 'rgba(255,255,255,0.02)');
+  sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheen; ctx.fillRect(0, 0, W, H);
+
+  var vg = ctx.createRadialGradient(W * 0.5, H * 0.45, Math.min(W, H) * 0.25, W * 0.5, H * 0.5, Math.max(W, H) * 0.78);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+}
+
+function hexToRgb(h) {
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+}
+
+/* ---------------- TTT chart ---------------------------------------------- */
+function ttt(canvas, pred) {
+  if (!canvas) return;
+  var dpr = Math.min(2, root.devicePixelRatio || 1);
+  var W = canvas.clientWidth || 420, H = canvas.clientHeight || 260;
+  canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
+  var ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  var padL = 62, padR = 14, padT = 26, padB = 40;
+  var x0 = padL, x1 = W - padR, y0 = padT, y1 = H - padB;
+  var tMin = 0, tMax = 5;              // log10 seconds
+  var Tmin = 600, Tmax = 1400;
+  function X(logt) { return x0 + (logt - tMin) / (tMax - tMin) * (x1 - x0); }
+  function Y(T) { return y1 - (T - Tmin) / (Tmax - Tmin) * (y1 - y0); }
+  function crisp(v) { return Math.round(v) + 0.5; }
+
+  var INK = '#ece4d6', IRON = '#938a7e', AMBER = '#d98a3d';
+  var MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
+
+  /* grid: decades and 100 °C steps as hairlines, minor log ticks on the axis */
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(236,228,214,0.06)';
+  for (var T = Tmin; T <= Tmax; T += 100) {
+    ctx.beginPath(); ctx.moveTo(x0, crisp(Y(T))); ctx.lineTo(x1, crisp(Y(T))); ctx.stroke();
+  }
+  for (var lt = 1; lt < 5; lt++) {
+    ctx.beginPath(); ctx.moveTo(crisp(X(lt)), y0); ctx.lineTo(crisp(X(lt)), y1); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(236,228,214,0.28)';
+  ctx.beginPath();
+  ctx.moveTo(crisp(x0), y0); ctx.lineTo(crisp(x0), crisp(y1)); ctx.lineTo(x1, crisp(y1));
+  ctx.stroke();
+  ctx.beginPath();
+  for (var dec = 0; dec < 5; dec++) {
+    for (var m = 1; m <= 9; m++) {
+      var tx = crisp(X(dec + Math.log10(m)));
+      var len = m === 1 ? 6 : 3;
+      ctx.moveTo(tx, crisp(y1)); ctx.lineTo(tx, crisp(y1) + len);
+    }
+  }
+  ctx.moveTo(crisp(X(5)), crisp(y1)); ctx.lineTo(crisp(X(5)), crisp(y1) + 6);
+  for (var T2 = Tmin; T2 <= Tmax; T2 += 100) {
+    ctx.moveTo(crisp(x0), crisp(Y(T2))); ctx.lineTo(crisp(x0) - (T2 % 200 ? 3 : 6), crisp(Y(T2)));
+  }
+  ctx.stroke();
+
+  ctx.font = '10.5px ' + MONO;
+  ctx.fillStyle = IRON;
+  ctx.textAlign = 'center';
+  var tl = ['1 s', '10 s', '100 s', '17 min', '2.8 h', '28 h'];
+  for (var lt2 = 0; lt2 <= 5; lt2++) {
+    ctx.textAlign = lt2 === 0 ? 'left' : lt2 === 5 ? 'right' : 'center';
+    ctx.fillText(tl[lt2], X(lt2) + (lt2 === 0 ? -2 : 0), y1 + 20);
+  }
+  ctx.textAlign = 'right';
+  for (var T3 = Tmin; T3 <= Tmax; T3 += 200) ctx.fillText(T3 + ' °C', x0 - 11, Y(T3) + 3.5);
+
+  ctx.font = '600 9.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif';
+  ctx.fillStyle = IRON;
+  ctx.textAlign = 'right';
+  ctx.fillText('TIME SINCE START OF FIRING, LOG', x1, y1 + 36);
+  ctx.textAlign = 'left';
+  ctx.fillText('TEMPERATURE', 0, y0 - 12);
+
+  /* TTT curves */
+  var vs = pred.ranked.filter(function (r) { return r.curve && r.curve.length && r.phase.kind !== 'metal'; }).slice(0, 4);
+  var colors = [AMBER, IRON, IRON, IRON];
+  vs.slice().reverse().forEach(function (r, i) {
+    var idx = vs.length - 1 - i;
+    var pts = r.curve.filter(function (p) { return p.T <= Tmax; });
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    pts.forEach(function (p, k) {
+      var px = X(Math.min(tMax, p.logt)), py = Y(p.T);
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.strokeStyle = colors[idx % colors.length];
+    ctx.globalAlpha = idx === 0 ? 1 : 0.85 - idx * 0.18;
+    ctx.lineWidth = idx === 0 ? 1.75 : 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  /* kiln path: temperature against time */
+  var sched = pred.sched;
+  ctx.beginPath();
+  var started = false;
+  for (var t = 0; t <= sched.total; t += Math.max(20, sched.total / 400)) {
+    var temp = sched.T(t);
+    if (temp < Tmin || temp > Tmax) continue;
+    var px2 = X(Math.min(tMax, Math.log10(t + 1))), py2 = Y(temp);
+    if (!started) { ctx.moveTo(px2, py2); started = true; } else ctx.lineTo(px2, py2);
+  }
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  /* labels: the top phase named at the nose of its curve */
+  if (vs.length) {
+    var pts0 = vs[0].curve.filter(function (p) { return p.T <= Tmax && p.T >= Tmin; });
+    var nose = pts0.reduce(function (a, p) { return !a || p.logt < a.logt ? p : a; }, null);
+    var lab = vs[0].phase.name;
+    ctx.font = 'italic 14px "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif';
+    var lw = ctx.measureText(lab).width;
+    var nx = nose ? X(Math.min(tMax, nose.logt)) : x0 + 10;
+    var ny = nose ? Y(nose.T) : y0 + 14;
+    ctx.fillStyle = AMBER;
+    if (nose) { ctx.beginPath(); ctx.arc(nx, ny, 2.5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = INK;
+    if (nx - lw - 12 > x0) { ctx.textAlign = 'right'; ctx.fillText(lab, nx - 10, ny + 4); }
+    else { ctx.textAlign = 'left'; ctx.fillText(lab, Math.min(nx + 10, x1 - lw), ny - 10); }
+  }
+  ctx.textAlign = 'right';
+  ctx.font = '10.5px ' + MONO;
+  ctx.fillStyle = IRON;
+  ctx.fillText('← left of a curve: crystallises', x1 - 4, y0 + 12);
+  ctx.textAlign = 'left';
+}
+
+GC.render = { surface: surface, surfaceAt: surfaceAt, ttt: ttt, fbm: fbm };
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+/* GLAZECAST — interface */
+(function (root) {
+'use strict';
+var GC = root.GC;
+var $ = function (id) { return document.getElementById(id); };
+var util = GC.util;
+
+var state = { presetId: 'bi-red', recipe: null, firing: null, tab: 'crystals', explore: null,
+              playFrac: 1, playing: false };
+var STRUCTURED = {hematite:1,willemite:1,cassiterite:1,zircon:1,corundum:1,magnetite:1,spinel:1,cuprite:1,rutile:1,quartz:1,bismuth:1,anorthite:1,diopside:1,zincite:1,leucite:1,wollastonite:1,baddeleyite:1,chromite:1};
+var lastKey = '';
+
+/* ---------------- formatting --------------------------------------------- */
+function pct(x) { return Math.round(x * 100) + '%'; }
+function pcv(x) { return (x * 100).toFixed(1) + ' vol%'; }
+function mm(x) { return x < 0.05 ? Math.round(x * 1000) + ' µm' : x.toFixed(x < 1 ? 2 : 1) + ' mm'; }
+function temp(x) { return Math.round(x) + ' °C'; }
+function dur(s) {
+  if (!isFinite(s)) return 'never';
+  if (s < 90) return Math.round(s) + ' s';
+  if (s < 5400) return Math.round(s / 60) + ' min';
+  return (s / 3600).toFixed(1) + ' h';
+}
+function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+/* set the unit after a number in a lighter weight: "1100 °C" -> 1100<small> °C</small> */
+function u(s) {
+  return String(s).replace(/(\d)\s?(°C\/h|°C|µm|mm|min|vol%|mol|pts|%|g|s|h)(?=$|[\s·/])/g, '$1<small class="u">&#8201;$2</small>');
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/* ---------------- boot ---------------------------------------------------- */
+function boot() {
+  var coneSel = $('f-cone');
+  GC.CONE_LIST.forEach(function (c) {
+    var o = document.createElement('option');
+    o.value = c; o.textContent = 'cone ' + c + '  ·  ' + GC.CONES[c] + ' °C';
+    coneSel.appendChild(o);
+  });
+  GC.ATMOSPHERES.forEach(function (a) {
+    var o = document.createElement('option');
+    o.value = a.id; o.textContent = a.name;
+    $('f-atm').appendChild(o);
+  });
+
+  var chips = $('presets');
+  GC.PRESETS.forEach(function (p, n) {
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.id = p.id;
+    b.innerHTML = '<span class="i">' + pad2(n + 1) + '</span><span class="nm">' + esc(p.name) + '</span><span class="k">' + esc(p.tag) + '</span>';
+    b.onclick = function () { loadPreset(p.id); };
+    chips.appendChild(b);
+  });
+
+  $('f-cone').onchange = function () {
+    state.firing.cone = this.value;
+    state.firing.peakC = GC.CONES[this.value];
+    $('f-peak').value = state.firing.peakC;
+    recompute();
+  };
+  $('f-atm').onchange = function () { state.firing.atmosphere = this.value; recompute(); };
+  $('f-cool').onchange = function () { state.firing.cooling = this.value; recompute(); };
+  $('f-peak').onchange = function () { state.firing.peakC = +this.value || state.firing.peakC; recompute(); };
+  $('f-holdc').onchange = function () { state.firing.holdC = +this.value; recompute(); };
+  $('f-holdm').onchange = function () { state.firing.holdMin = +this.value; recompute(); };
+  $('f-soak').onchange = function () { state.firing.soakMin = +this.value; recompute(); };
+
+  var slider = $('t-slider');
+  slider.oninput = function () {
+    state.playing = false;
+    state.playFrac = parseFloat(this.value) || 1;
+    drawTimed();
+    $('t-play').textContent = '\u25b6';
+  };
+  $('t-play').onclick = function () { togglePlay(); };
+
+  $('add-row').onclick = function () {
+    state.recipe.push({ id: 'silica', wt: 5 });
+    buildRows();
+    recompute();
+  };
+
+  $('tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (b) setTab(b.dataset.tab);
+  });
+
+  root.addEventListener('resize', debounce(function () {
+    if (state.pred) { GC.render.surface($('surface'), state.pred); if (state.tab === 'kinetics') drawTTT(); }
+  }, 200));
+
+  var h = location.hash.replace(/^#/, '').split('/');
+  loadPreset(GC.PRESET_BY_ID[h[0]] ? h[0] : 'bi-red');
+  var timeSeg = null;
+  if (h[1] && /^\d/.test(h[1])) timeSeg = h[1];
+  else if (h[1]) setTab(h[1]);
+  if (!timeSeg && h[2] && /^\d/.test(h[2])) timeSeg = h[2];
+  if (timeSeg) {
+    state.playFrac = GC.util.clamp(parseFloat(timeSeg) || 1, 0, 1);
+    setTimeout(drawTimed, 80);
+  }
+}
+
+function setTab(tab) {
+  if (!tab) return;
+  state.tab = tab;
+  [].forEach.call(document.querySelectorAll('#tabs button'), function (x) {
+    x.classList.toggle('on', x.dataset.tab === tab);
+  });
+  [].forEach.call(document.querySelectorAll('.pane'), function (x) {
+    x.classList.toggle('on', x.id === 'pane-' + tab);
+  });
+  if (tab === 'kinetics') requestAnimationFrame(drawTTT);
+}
+
+function loadPreset(id) {
+  var p = GC.PRESET_BY_ID[id];
+  if (!p) return;
+  state.presetId = id;
+  state.recipe = p.recipe.map(function (l) { return { id: l.id, wt: l.wt }; });
+  state.firing = Object.assign({}, p.firing);
+  [].forEach.call(document.querySelectorAll('#presets .chip'), function (c) {
+    c.classList.toggle('on', c.dataset.id === id);
+  });
+  $('preset-blurb').textContent = p.blurb;
+  $('f-cone').value = p.firing.cone;
+  $('f-peak').value = p.firing.peakC;
+  $('f-atm').value = p.firing.atmosphere;
+  $('f-cool').value = p.firing.cooling;
+  $('f-holdc').value = p.firing.holdC;
+  $('f-holdm').value = p.firing.holdMin;
+  $('f-soak').value = p.firing.soakMin;
+  buildRows();
+  recompute();
+}
+
+/* ---------------- recipe rows -------------------------------------------- */
+function groups() {
+  return [
+    ['former', 'Formers'], ['clay', 'Clays'], ['flux', 'Fluxes'],
+    ['opacifier', 'Opacifiers'], ['colourant', 'Colourants'], ['special', 'Redox']
+  ];
+}
+
+function buildRows() {
+  var host = $('recipe-rows');
+  host.innerHTML = '';
+  var optCache = '';
+  groups().forEach(function (g) {
+    var items = GC.MATERIALS.filter(function (m) { return m.kind === g[0]; });
+    if (!items.length) return;
+    optCache += '<optgroup label="' + g[1] + '">';
+    items.forEach(function (m) {
+      optCache += '<option value="' + m.id + '">' + esc(m.name) + '</option>';
+    });
+    optCache += '</optgroup>';
+  });
+
+  state.recipe.forEach(function (line, i) {
+    var row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = '<select data-i="' + i + '" aria-label="material ' + (i + 1) + '">' + optCache + '</select>' +
+      '<input type="number" step="0.1" min="0" data-i="' + i + '" value="' + line.wt + '" aria-label="grams">' +
+      '<button class="del" data-i="' + i + '" title="remove" aria-label="remove material">×</button>';
+    host.appendChild(row);
+    var sel = row.querySelector('select');
+    sel.value = line.id;
+  });
+
+  host.onchange = function (e) {
+    var t = e.target;
+    if (!t.dataset || t.dataset.i === undefined) return;
+    var i = +t.dataset.i;
+    if (t.tagName === 'SELECT') state.recipe[i].id = t.value;
+    else state.recipe[i].wt = +t.value;
+    recompute();
+  };
+  host.onclick = function (e) {
+    if (!e.target.classList.contains('del')) return;
+    state.recipe.splice(+e.target.dataset.i, 1);
+    buildRows();
+    recompute();
+  };
+}
+
+/* ---------------- compute ------------------------------------------------ */
+function recompute() {
+  var key = JSON.stringify([state.recipe, state.firing]);
+  if (key === lastKey) return;
+  lastKey = key;
+  var pred = GC.engine.predict(state.recipe, state.firing);
+  state.pred = pred;
+  state.explore = GC.engine.explore(state.recipe, state.firing);
+  state.playFrac = 1;
+  state.playing = false;
+  render(pred);
+  $('t-slider').value = '1';
+  $('t-readout').textContent = 'fired';
+  $('t-play').textContent = '\u25b6';
+}
+
+function render(pred) {
+  var comp = pred.comp, app = pred.optics, vis = pred.ranked.filter(function (r) { return r.visible; });
+  var top = vis[0] || null;
+
+  $('batch-total').textContent = 'batch ' + Math.round(comp.totalMass) + ' g';
+  $('batch-loi').textContent = 'LOI ' + comp.loi.toFixed(1) + ' g';
+
+  $('v-headline').textContent = pred.verdict.headline;
+  $('v-detail').textContent = pred.verdict.detail;
+
+  var conf = confidence(pred);
+  $('v-conf').innerHTML = '<span class="pip" style="background:' + conf.color + '"></span>' +
+    '<span>confidence <b>' + conf.level + '</b> · ' + conf.why + '</span>';
+
+  var facts = [];
+  facts.push(['Surface', '<span class="swatch" style="background:' + app.hex + '"></span>' + app.name]);
+  if (top) {
+    facts.push(['Crystal system', top.phase.system]);
+    facts.push(['Space group', '<span class="mono">' + top.phase.sg + '</span>']);
+    facts.push(['Habit', top.phase.shape]);
+    facts.push(['Crystal size', u(mm(top.sizeMm))]);
+    facts.push(['Crystal load', u((top.volFrac * 100).toFixed(1) + ' vol%')]);
+    facts.push(['Nucleation', top.phase.kind === 'metal' ? 'metal separates' : top.seeded ? 'seeded / undissolved' : 'from the melt']);
+  } else {
+    facts.push(['Opacity', app.opacity > 0.5 ? 'opaque' : app.opacity > 0.12 ? 'opalescent' : 'transparent']);
+    facts.push(['Expansion', Math.round(comp.cte) + 'e-7']);
+    facts.push(['NBO/T', comp.nboT.toFixed(2)]);
+    facts.push(['Unity SiO2', (comp.unity.SiO2 || 0).toFixed(2)]);
+    facts.push(['Crystalline', 'none']);
+    facts.push(['Si:Al', comp.siAl.toFixed(1)]);
+  }
+  $('v-facts').innerHTML = facts.map(function (f) {
+    return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>';
+  }).join('');
+
+  $('surface-badge').textContent = app.kind === 'metal' ? 'metal · simulated' : 'simulated';
+  GC.render.surface($('surface'), pred);
+
+  renderChain(pred);
+  renderCrystals(pred);
+  renderKinetics(pred);
+  renderChemistry(pred);
+  renderLevers(pred);
+  if (state.tab === 'kinetics') drawTTT();
+}
+
+function confidence(pred) {
+  var vis = pred.ranked.filter(function (r) { return r.visible; });
+  if (!vis.length) return { level: 'high', why: 'nothing saturates', color: '#76a99b' };
+  var top = vis[0], second = vis[1];
+  var s = 0;
+  if (top.X > 0.35) s += 1;
+  if (top.seeded) s += 1;
+  if (!second || top.X > second.X * 2) s += 1;
+  if (top.phase.kind === 'metal') s += 1;
+  var why = top.seeded ? 'phase never dissolved' :
+    (second ? 'margin over ' + second.phase.name : 'only candidate');
+  return s >= 3 ? { level: 'high', why: why, color: '#76a99b' }
+    : s >= 2 ? { level: 'medium', why: why, color: '#d98a3d' }
+      : { level: 'low', why: 'close call', color: '#c9735e' };
+}
+
+/* ---------------- narrative chain ---------------------------------------- */
+function renderChain(pred) {
+  var comp = pred.comp, spec = pred.spec;
+  var vis = pred.ranked.filter(function (r) { return r.visible; });
+  var top = vis[0] || null;
+  var cards = [];
+
+  cards.push(['Melt', 'SiO2:Al2O3 ' + comp.siAl.toFixed(1) + '<br>NBO/T ' + comp.nboT.toFixed(2) + ' · Λ ' + comp.basicity.toFixed(2)]);
+
+  var best = spec.elements.slice().sort(function (a, b) { return Math.abs(b.reducedFrac - 0.5) - Math.abs(a.reducedFrac - 0.5); })[0];
+  cards.push(['Redox', best ? best.el + ' ' + pct(best.reducedFrac) + ' as ' + best.species.replace(/[0-9]*[+-]?$/, '') + '<br>R ' + spec.strength.toFixed(2) : 'no couple<br>R ' + spec.strength.toFixed(2)]);
+
+  if (top && top.phase.kind === 'metal') {
+    cards.push(['Kinetics', top.phase.name + '<br>freezes at ' + temp(top.phase.Tm - 273) + ' · ' + pcv(top.volFrac) + ' metal']);
+  } else if (top) {
+    cards.push(['Kinetics', top.phase.name + '<br>' + (top.seeded ? 'seeded' : 'nucleates') + ' · ' + dur(top.tBest) + ' at ' + (top.Tbest ? temp(top.Tbest - 273) : '—')]);
+  } else {
+    cards.push(['Kinetics', 'no TTT crossing<br>glass']);
+  }
+
+  $('chain').innerHTML = cards.map(function (c) {
+    return '<div><dt>' + c[0] + '</dt><dd>' + c[1] + '</dd></div>';
+  }).join('');
+}
+
+/* ---------------- crystals pane ------------------------------------------ */
+function renderCrystals(pred) {
+  var vis = pred.ranked.filter(function (r) { return r.visible || r.phase.kind !== 'metal'; }).slice(0, 7);
+  var rows = vis.map(function (r, i) {
+    var p = r.phase;
+    var tag = r.seeded ? '<span class="tag">seeded</span>' : '';
+    return '<div class="ph">' +
+      '<div class="n">' + pad2(i + 1) + '</div>' +
+      '<div class="main"><div class="nm">' + esc(p.name) + '<small>' + esc(p.formula) + '</small>' + tag + '</div>' +
+      '<div class="meta">' + p.system + ' · ' + p.sg + ' · ' + esc(p.habit) + '</div></div>' +
+      '<div class="bar"><i style="width:' + Math.min(100, Math.sqrt(r.volFrac) * 190) + '%"></i></div>' +
+      '<div class="val"><b>' + (r.volFrac * 100).toFixed(1) + '<small class="u">%</small></b>' + mm(r.sizeMm) + ' · ' + pct(r.X) + '</div>' +
+      '</div>';
+  }).join('');
+
+  var ladder = pred.spec.elements.slice().sort(function (a, b) { return b.ease - a.ease; }).map(function (e) {
+    var p = Math.round(e.reducedFrac * 100);
+    return '<div class="lad"><div class="el">' + e.el + '</div>' +
+      '<div class="track"><i style="width:' + p + '%"></i></div>' +
+      '<div class="pct">' + p + '<small class="u">%</small> ' + e.species.replace(/[0-9]*[+-]?$/, '') + '</div></div>';
+  }).join('');
+
+  $('pane-crystals').innerHTML =
+    '<div class="split"><div>' +
+    '<h3>Ranked phases</h3>' +
+    (rows ? '<div class="rank">' + rows + '</div>' : '<p class="hint">Nothing above threshold. The melt is undersaturated in every phase in the database.</p>') +
+    '</div><div>' +
+    '<h3>Redox ladder</h3>' +
+    '<div class="ladder">' + ladder + '</div>' +
+    '<p class="hint" style="margin-top:16px">Each bar is the fraction of that element in its reduced state at your atmosphere (R = ' +
+    pred.spec.strength.toFixed(2) + '); the tick marks half. The ladder is why bismuth goes metallic in a reduction kiln and does nothing in oxidation: ' +
+    'its couple sits above iron, so the same CO that reduces Fe3+ has already reduced Bi3+.</p>' +
+    '</div></div>';
+}
+
+/* ---------------- kinetics pane ------------------------------------------ */
+function renderKinetics(pred) {
+  var vis = pred.ranked.filter(function (r) { return r.visible; });
+  var top = vis[0];
+  var sched = pred.sched;
+  var desc = [
+    ['peak', temp(sched.peak)],
+    ['hold', sched.holdS ? temp(sched.holdC) + ' / ' + Math.round(sched.holdS / 60) + ' min' : 'none'],
+    ['cooling', Math.round(sched.coolingRate) + ' °C/h'],
+    ['time > 900 °C', dur((sched.bins.reduce(function (s, v, i) {
+      return i * 10 + 300 > 900 ? s + v : s;
+    }, 0)))],
+    ['top phase', top ? top.phase.name : 'none'],
+    ['time to nucleate', top && top.phase.kind === 'metal' ? 'freezes ' + temp(top.phase.Tm - 273) : top ? dur(top.tBest) : '—']
+  ];
+
+  $('pane-kinetics').innerHTML =
+    '<div class="split"><div>' +
+    '<h3>Time–temperature–transformation</h3>' +
+    '<div class="chart"><canvas id="ttt"></canvas></div>' +
+    '<div class="legend">' +
+    '<span><i style="background:#d98a3d"></i>top phase</span>' +
+    '<span><i style="background:#938a7e"></i>competitors</span>' +
+    '<span><i class="dash"></i>your kiln path</span>' +
+    '<span class="aside">log time × temperature</span></div>' +
+    '<p class="hint" style="margin-top:18px">A phase only appears if your cooling path passes to the <b>left</b> of its curve — ' +
+    'inside the time it needs at that temperature. C-shaped curves are the signature of nucleation theory: too hot and the driving force is tiny, too cold and diffusion stops.</p>' +
+    '</div><div>' +
+    '<h3>Your schedule</h3>' +
+    '<dl class="desc">' + desc.map(function (d) { return '<div><dt>' + d[0] + '</dt><dd>' + u(d[1]) + '</dd></div>'; }).join('') + '</dl>' +
+    '<p class="hint" style="margin-top:18px">' + kineticsNote(pred) + '</p>' +
+    '</div></div>';
+}
+
+function kineticsNote(pred) {
+  var vis = pred.ranked.filter(function (r) { return r.visible; });
+  var top = vis[0];
+  if (top && top.phase.kind === 'metal') {
+    return 'Metals are not a nucleation problem. ' + top.phase.name + ' is already a separate liquid at your peak temperature, so it simply freezes at ' +
+      temp(top.phase.Tm - 273) + ' on the way down. What matters is how much of the metal was reduced and how slowly you passed the freezing point: slower cooling gives fewer, larger, better-formed hopper plates.';
+  }
+  if (!top) {
+    var best = pred.ranked[0];
+    if (!best) return 'No phase even reaches its saturation threshold, so temperature and time cannot help. Change the chemistry.';
+    return 'The closest phase is ' + best.phase.name + ' at ' + pct(best.sat) + ' of its threshold — it never becomes supersaturated, so no hold will make it appear. That is a chemistry problem, not a firing problem.';
+  }
+  var t = top.tBest, T = top.Tbest ? top.Tbest - 273 : null;
+  var held = pred.sched.holdS / 60;
+  var parts = [];
+  parts.push(top.phase.name + ' needs about <b>' + dur(t) + '</b> at ' + temp(T) + ' to reach a visible crystal size.');
+  if (held > 0) parts.push('You hold for ' + held + ' min at ' + temp(pred.sched.holdC) + ', so the growth window is ' + (held * 60 > t ? 'comfortably open' : 'marginal') + '.');
+  parts.push(dur(top.tBelow) + ' of the schedule sits below the liquidus of ' + temp(top.TmEff - 273) + '.');
+  if (top.seeded) parts.push('It never fully dissolves at your peak, so undissolved grains are acting as seeds — that is why it starts so readily.');
+  return parts.join(' ');
+}
+
+function drawTTT() {
+  if (state.pred) GC.render.ttt($('ttt'), state.pred);
+}
+
+/* ---------------- chemistry pane ----------------------------------------- */
+function renderChemistry(pred) {
+  var comp = pred.comp;
+  var desc = [
+    ['NBO/T', comp.nboT.toFixed(2), ''],
+    ['basicity Λ', comp.basicity.toFixed(2), ''],
+    ['SiO2:Al2O3', comp.siAl.toFixed(1), ''],
+    ['R2O:RO', (comp.r2o / Math.max(comp.ro, 1e-6)).toFixed(2), ''],
+    ['B2O3', (comp.unity.B2O3 || 0).toFixed(2), ''],
+    ['exp · 1e-7', Math.round(comp.cte), ''],
+    ['LOI', comp.loi.toFixed(1) + ' g', ''],
+    ['unity basis', comp.fluxBasis.toFixed(2) + ' mol', '']
+  ];
+
+  var ox = Object.keys(comp.unity)
+    .filter(function (k) { return comp.unity[k] > 0.004; })
+    .sort(function (a, b) { return comp.unity[b] - comp.unity[a]; })
+    .map(function (k) {
+      var wt = (comp.mass[k] || 0) / comp.totalMass * 100;
+      return '<tr><td class="k">' + GC.OXIDES[k].label + '</td><td class="num">' + comp.unity[k].toFixed(3) +
+        '</td><td class="num">' + wt.toFixed(2) + '</td></tr>';
+    }).join('');
+
+  var warn = pred.warnings.length
+    ? pred.warnings.map(function (w) {
+      return '<div class="warn ' + w.level + '">' + esc(w.text) + '</div>';
+    }).join('')
+    : '<div class="warn info">Nothing structural to flag: expansion is compatible, no heavy-metal loading, no runaway flux.</div>';
+
+  $('pane-chemistry').innerHTML =
+    '<h3>Melt descriptors</h3>' +
+    '<dl class="desc">' + desc.map(function (d) { return '<div><dt>' + d[0] + '</dt><dd>' + u(d[1]) + '</dd></div>'; }).join('') + '</dl>' +
+    '<div class="cols">' +
+    '<div><h3>Unity formula</h3><table><thead><tr><th>oxide</th><th class="num">unity</th><th class="num">wt%</th></tr></thead><tbody>' + ox + '</tbody></table></div>' +
+    '<div><h3>Saturation vs threshold</h3>' + saturationTable(pred) + '</div>' +
+    '<div><h3>Flags</h3>' + warn + '</div>' +
+    '</div>';
+}
+
+function saturationTable(pred) {
+  var rows = pred.ranked.slice(0, 5).map(function (r) {
+    var ok = r.sat >= 1;
+    return '<tr><td class="k">' + esc(r.phase.name) + '</td><td class="num">' + r.sat.toFixed(2) + '×</td>' +
+      '<td class="num" style="color:' + (ok ? '#76a99b' : '#c9735e') + '">' + (ok ? 'super' : 'under') + '</td></tr>';
+  }).join('');
+  if (!rows) return '<p class="hint">No phase came within reach of its threshold.</p>';
+  return '<table><thead><tr><th>phase</th><th class="num">sat</th><th class="num">state</th></tr></thead><tbody>' + rows +
+    '</tbody></table><p class="hint">1.00× is the composition where the phase first appears. Above 1 the melt is supersaturated and can precipitate it; below 1 nothing you do to the firing will help.</p>';
+}
+
+/* ---------------- levers pane -------------------------------------------- */
+function renderLevers(pred) {
+  var ex = state.explore;
+  if (!ex) return;
+  var rows = ex.variants.map(function (v) {
+    var d = v.delta >= 0 ? '+' + Math.round(v.delta * 100) + ' pts' : Math.round(v.delta * 100) + ' pts';
+    return '<div class="lever' + (v.changed ? ' flip' : '') + '">' +
+      '<div class="lbl">' + esc(v.label) + '</div>' +
+      '<div class="res">→ ' + (v.top === 'glass' ? 'stays glassy' : esc(v.topName)) + '</div>' +
+      '<div class="d' + (v.delta < 0 ? ' neg' : '') + '">' + d + '</div></div>';
+  }).join('');
+
+  $('pane-levers').innerHTML =
+    '<div class="split"><div>' +
+    '<h3>What actually changes the answer</h3>' + rows +
+    '</div><div>' +
+    '<h3>Reading this</h3>' +
+    '<p class="hint" style="margin-top:16px">Each row is a real re-run of the chemistry through the same model: flip the atmosphere, slow the cooling, extend the hold, push the cone. ' +
+    'A marked row means the dominant phase changes outright — those are the levers worth pulling. The rest just make the same crystal bigger or smaller.</p>' +
+    '<p class="key"><i></i>dominant phase changes</p>' +
+    '</div></div>';
+}
+
+/* ---- firing replay ------------------------------------------------------- */
+function fmtDur(sec) {
+  if (sec < 90) return Math.round(sec) + ' s';
+  if (sec < 5400) return Math.round(sec / 60) + ' min';
+  return (sec / 3600).toFixed(1) + ' h';
+}
+
+function drawTimed() {
+  var pred = state.pred;
+  if (!pred) return;
+  var t = state.playFrac * pred.sched.total;
+  var end = state.playFrac >= 0.999;
+  GC.render.surfaceAt($('surface'), pred, end ? null : t);
+
+  var T = pred.sched.T(t);
+  var set = pred._crystals || { crystals: [], metal: [] };
+  var born = 0, total = set.crystals.length + set.metal.length;
+  set.crystals.concat(set.metal).forEach(function (c) { if (c.birth <= t) born++; });
+  var top = pred.ranked.filter(function (r) { return r.visible; })[0];
+  var label = end ? 'fired' : (born === 0 ? 'melt' : (born < total ? 'crystallising' : 'cooling'));
+  var extra = end && top ? ' · ' + top.phase.name : '';
+  $('t-readout').textContent = label + ' · ' + fmtDur(t) + ' · ' + Math.round(T) + ' \u00b0C' + extra;
+  var slider = $('t-slider');
+  if (slider) slider.value = String(state.playFrac);
+}
+
+function togglePlay() {
+  if (state.playing) {
+    state.playing = false;
+    $('t-play').textContent = '\u25b6';
+    return;
+  }
+  if (state.playFrac >= 1) state.playFrac = 0;
+  state.playing = true;
+  $('t-play').textContent = '\u2759\u2759';
+  var last = (root.performance && root.performance.now) ? root.performance.now() : Date.now();
+  function step(now) {
+    if (!state.playing) return;
+    var dt = (now - last) / 1000;
+    last = now;
+    state.playFrac = Math.min(1, state.playFrac + dt / 16);
+    drawTimed();
+    if (state.playFrac >= 1) {
+      state.playing = false;
+      $('t-play').textContent = '\u25b6';
+      return;
+    }
+    root.requestAnimationFrame(step);
+  }
+  root.requestAnimationFrame(step);
+}
+
+function debounce(fn, ms) {
+  var t;
+  return function () { clearTimeout(t); t = setTimeout(fn, ms); };
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+</body>
+</html>
