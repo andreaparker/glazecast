@@ -19,6 +19,7 @@ crystals + dopants ────────────────────�
 | | |
 |---|---|
 | App | open `index.html`. No server, no build, no dependencies. |
+| Glaze archive | `glazes.html`. 33,155 public Glazy recipes, each run through the same engine. |
 | Single file | `dist/glazecast.html`. Everything inlined into one file. |
 | Tests | `node tests/run.mjs`. 39 assertions against known glaze outcomes. |
 | CLI | `node cli.mjs bi-red`, `node cli.mjs --json tenmoku`, `node cli.mjs --file myglaze.json` |

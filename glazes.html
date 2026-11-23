@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GLAZECAST — 33,000 real glazes, run through the chemistry</title>
+<style>
+  :root{
+    --ground:#0c0b0a; --panel:#141210; --line:#2a251f;
+    --ink:#f1eae0; --ink2:#c9c0b4; --iron:#8b8175; --dim:#6d6459;
+    --amber:#e08a3c; --amber2:#ffc07a; --teal:#74b3a6; --oxblood:#d98390;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+       font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+       background-image:radial-gradient(1200px 600px at 20% -10%,rgba(224,138,60,.06),transparent 70%)}
+  a{color:var(--amber2);text-decoration:none;border-bottom:1px solid rgba(224,138,60,.35)}
+  a:hover{color:#ffd9ac}
+  .wrap{max-width:1240px;margin:0 auto;padding:36px 24px 80px}
+  header{display:flex;align-items:baseline;justify-content:space-between;
+         border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:30px;flex-wrap:wrap;gap:10px}
+  .brand{font-family:var(--serif);font-size:20px;letter-spacing:.24em;font-weight:400}
+  .brand span{color:var(--iron);letter-spacing:.1em;font-size:13px;margin-left:12px}
+  nav a{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+        border:0;color:var(--iron);margin-left:18px}
+  nav a:hover{color:var(--ink)}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(28px,4vw,44px);line-height:1.05;
+     margin:0 0 12px;letter-spacing:-.01em}
+  .lede{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--ink2);
+        max-width:70ch;margin:0 0 8px}
+  .note{font-size:12.5px;color:var(--iron);max-width:80ch;line-height:1.6;margin:10px 0 0}
+  .note b{color:var(--ink2);font-weight:600}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+         background:var(--line);border:1px solid var(--line);margin:26px 0 4px}
+  .stat{background:var(--panel);padding:12px 14px}
+  .stat dt{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 4px}
+  .stat dd{margin:0;font-family:var(--mono);font-size:15px}
+  .stat dd small{font-size:10px;color:var(--iron);display:block;margin-top:2px}
+
+  .controls{display:grid;grid-template-columns:minmax(180px,1.4fr) repeat(auto-fit,minmax(120px,0.8fr));
+            gap:10px;margin:24px 0 12px}
+  .controls input,.controls select{
+    background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    border-radius:3px;padding:8px 10px;font-size:12.5px;font-family:var(--sans);width:100%}
+  .controls input:focus,.controls select:focus{outline:none;border-color:var(--amber)}
+  .count{font-family:var(--mono);font-size:11px;color:var(--iron);margin:0 0 8px}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{color:var(--dim);font-weight:500;font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+     text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);
+     position:sticky;top:0;background:var(--ground)}
+  td{padding:7px 10px;border-bottom:1px solid rgba(42,37,31,.65);vertical-align:top}
+  td.name{color:var(--ink)}
+  td.name small{display:block;color:var(--dim);font-size:10.5px}
+  td.mono,th.num{font-family:var(--mono);text-align:right}
+  .chipdot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;
+           border:1px solid rgba(255,255,255,.25);vertical-align:-1px}
+  .ph-tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.05em;
+          border:1px solid var(--line);border-radius:3px;padding:1px 6px;color:var(--ink2)}
+  .kind-g{color:var(--teal)} .kind-m{color:var(--amber2)} .kind-c{color:var(--oxblood)}
+  .more{display:block;margin:18px auto 0;background:none;border:1px solid var(--line);
+        color:var(--iron);padding:8px 18px;border-radius:3px;cursor:pointer;font-size:12px}
+  .more:hover{border-color:var(--amber);color:var(--amber2)}
+  footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);
+         font-size:11.5px;line-height:1.7;max-width:90ch}
+  footer b{color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">GLAZECAST<span>glazes</span></div>
+    <nav><a href="./">the tool</a><a href="structures.html">unit cells</a></nav>
+  </header>
+
+  <h1>33,155 published glazes. Same chemistry, repeated.</h1>
+  <p class="lede">Every public glaze recipe in the Glazy archive, reduced to oxide moles and run through
+    the same model as the tool on the front page.</p>
+  <p class="note">No two of these recipes were made by the same person using the same bag of feldspar, and the
+    archive itself is noisy: duplicates, variants, recipes shared before they were tested. What is not noisy is the
+    oxide chemistry underneath. Each row below is one recipe, its oxide analysis as published, and what that
+    analysis says will crystallise on the surface when fired. A row that predicts a crystal is a recipe where the
+    chemistry sits above the phase's saturation threshold; it still needs the right cooling. The column
+    <b>Si:Al</b> is the silica-to-alumina molar ratio, the single number most glaze chemistry reduces to.</p>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="controls">
+    <input id="f-q" type="search" placeholder="search name, author, subcategory…">
+    <select id="f-cone"><option value="">all cones</option></select>
+    <select id="f-atm"><option value="">any atmosphere</option></select>
+    <select id="f-phase"><option value="">any predicted phase</option></select>
+    <select id="f-kind">
+      <option value="">any outcome</option>
+      <option value="glass">glassy</option>
+      <option value="crystal">crystalline</option>
+      <option value="metal">metallic</option>
+    </select>
+    <select id="f-sort">
+      <option value="name">sort: name</option>
+      <option value="siAl">sort: Si:Al low → high</option>
+      <option value="nboT">sort: NBO/T high → low</option>
+      <option value="cte">sort: expansion high → low</option>
+    </select>
+  </div>
+  <p class="count" id="count"></p>
+
+  <table>
+    <thead><tr>
+      <th>recipe</th><th>cone</th><th>atm</th><th>predicted surface</th>
+      <th class="num">Si:Al</th><th class="num">NBO/T</th><th class="num">SiO₂</th><th class="num">exp ·1e-7</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <button class="more" id="more">show more</button>
+
+  <footer>
+    <b>Data.</b> Glazy public archive (<a href="https://github.com/derekphilipau/glazy-data">derekphilipau/glazy-data</a>,
+    snapshot 2026-05-31), CC BY-NC-SA 4.0. Each row links to the original recipe on glazy.org.
+    <b>Firing assumptions</b> applied uniformly, because the archive rarely records the kiln: first listed
+    atmosphere, the first cone in a range, slow cooling, 30 min hold 120 °C under peak. The predicted phase is what
+    the chemistry permits, not a claim about what any individual pot actually fired.
+  </footer>
+</div>
+
+<script src="data/glazes.js"></script>
+<script>
+(function () {
+  var DATA = window.GLAZES || [];
+  var LIMIT = 400, shown = 0;
+
+  /* aggregates */
+  var phaseCount = {}, coneCount = {}, kindCount = {};
+  var nboSum = 0, siAlSum = 0;
+  DATA.forEach(function (g) {
+    phaseCount[g.phase || 'glass'] = (phaseCount[g.phase || 'glass'] || 0) + 1;
+    var c = String(g.cone || '?').split(/\s*[-–]\s*/)[0];
+    coneCount[c] = (coneCount[c] || 0) + 1;
+    kindCount[g.kind] = (kindCount[g.kind] || 0) + 1;
+    nboSum += g.nboT; siAlSum += g.siAl;
+  });
+  function top(obj, n) {
+    return Object.entries(obj).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n);
+  }
+  var meanNbo = nboSum / DATA.length, meanSiAl = siAlSum / DATA.length;
+  var s = [
+    ['glazes', DATA.length, ''],
+    ['glassy', kindCount.glass || 0, 'no phase saturates'],
+    ['crystalline', kindCount.crystal || 0, 'a phase saturates and grows'],
+    ['metallic', kindCount.metal || 0, 'reduced metal (Cu, Bi, Ag)'],
+    ['mean Si:Al', meanSiAl.toFixed(1), ''],
+    ['mean NBO/T', meanNbo.toFixed(2), '']
+  ];
+  document.getElementById('stats').innerHTML = s.map(function (x) {
+    return '<div class="stat"><dt>' + x[0] + '</dt><dd>' + x[1] + (x[2] ? '<small>' + x[2] + '</small>' : '') + '</dd></div>';
+  }).join('');
+
+  /* filter controls */
+  var cones = top(coneCount, 14).map(function (x) { return x[0]; });
+  var cs = document.getElementById('f-cone');
+  cones.forEach(function (c) { cs.innerHTML += '<option>' + c + '</option>'; });
+  var phases = top(phaseCount, 20);
+  var ps = document.getElementById('f-phase');
+  phases.forEach(function (p) {
+    if (p[0] === 'glass') return;
+    ps.innerHTML += '<option value="' + p[0] + '">' + p[0] + ' (' + p[1] + ')</option>';
+  });
+
+  function visibleRows() {
+    var q = document.getElementById('f-q').value.toLowerCase();
+    var cone = document.getElementById('f-cone').value;
+    var atm = document.getElementById('f-atm').value;
+    var phase = document.getElementById('f-phase').value;
+    var kind = document.getElementById('f-kind').value;
+    var sort = document.getElementById('f-sort').value;
+    var rows = DATA.filter(function (g) {
+      if (q && (g.name + ' ' + g.author + ' ' + g.sub).toLowerCase().indexOf(q) < 0) return false;
+      if (cone && String(g.cone).indexOf(cone) !== 0 && String(g.cone).indexOf(' - ') < 0) {
+        if (String(g.cone).split(/\s*[-–]\s*/)[0] !== cone) return false;
+      }
+      if (atm) {
+        var a = g.atm.toLowerCase();
+        var want = atm.toLowerCase();
+        var isRed = want === 'reduction';
+        if (isRed) { if (a.indexOf('reduction') < 0) return false; }
+        else if (a.indexOf(want) < 0) return false;
+      }
+      if (phase && (g.phase || 'glass') !== phase) return false;
+      if (kind && g.kind !== kind) return false;
+      return true;
+    });
+    if (sort === 'name') rows.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (sort === 'siAl') rows.sort(function (a, b) { return a.siAl - b.siAl; });
+    if (sort === 'nboT') rows.sort(function (a, b) { return b.nboT - a.nboT; });
+    if (sort === 'cte') rows.sort(function (a, b) { return b.cte - a.cte; });
+    return rows;
+  }
+
+  function render() {
+    var rows = visibleRows();
+    shown = 0;
+    var tb = document.getElementById('rows');
+    tb.innerHTML = '';
+    document.getElementById('count').textContent = rows.length + ' glazes match';
+    var slice = rows.slice(0, LIMIT);
+    slice.forEach(function (g) {
+      var tr = document.createElement('tr');
+      var pname = g.phaseName || 'glassy';
+      var kc = g.kind === 'glass' ? 'kind-g' : g.kind === 'metal' ? 'kind-m' : 'kind-c';
+      tr.innerHTML =
+        '<td class="name"><a href="https://glazy.org/recipes/' + g.id + '" target="_blank" rel="noopener">' +
+        g.name.replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) + '</a>' +
+        '<small>' + g.author.replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) +
+        (g.sub ? ' · ' + g.sub.replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) : '') + '</small></td>' +
+        '<td class="mono">' + (g.cone || '?') + '</td>' +
+        '<td class="mono">' + (g.atm || '') + '</td>' +
+        '<td><span class="chipdot" style="background:' + g.hex + '"></span>' +
+        '<span class="ph-tag ' + kc + '">' + pname.replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) + '</span></td>' +
+        '<td class="mono">' + g.siAl.toFixed(1) + '</td>' +
+        '<td class="mono">' + g.nboT.toFixed(2) + '</td>' +
+        '<td class="mono">' + g.uSiO2.toFixed(2) + '</td>' +
+        '<td class="mono">' + g.cte + '</td>';
+      tb.appendChild(tr);
+      shown++;
+    });
+    document.getElementById('more').style.display = slice.length < rows.length ? 'block' : 'none';
+  }
+
+  ['f-q', 'f-cone', 'f-atm', 'f-phase', 'f-kind', 'f-sort'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', render);
+  });
+  document.getElementById('more').addEventListener('click', function () {
+    LIMIT += 400;
+    render();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
