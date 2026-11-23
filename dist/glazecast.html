@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GLAZECAST — predict the crystal</title>
+<title>GLAZECAST: predict the crystal</title>
 <style>
   :root{
     /* ground: kiln brick gone cold; ink: bone ash; accent: the kiln at 1000 °C */
@@ -385,7 +385,7 @@
       <svg viewBox="0 0 17 30" aria-hidden="true"><path d="M3.2 29.5 L6.6 9.2 Q7.6 3.4 13.6 1.6 Q9.8 5.6 10.1 11 L13.8 29.5 Z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M1 29.5 H16" stroke="#d98a3d" stroke-width="1"/></svg>
       <span class="wordmark">Glazecast</span>
     </div>
-    <p class="proposition">Enter a glaze recipe and its firing; read the crystal it will grow, with its system, habit, size and colour.</p>
+    <p class="proposition">Enter a glaze recipe and its firing to get the predicted crystal: its system, habit, size and colour.</p>
     <p class="status label"><a href="structures.html" style="color:inherit;border-bottom:1px solid rgba(217,138,61,.4);text-decoration:none">The unit cells ↗</a> &nbsp;·&nbsp; <span class="live"></span>Live · every edit recomputes</p>
   </header>
 
@@ -449,16 +449,16 @@
           <div class="field"><label for="f-peak">Peak <span class="unit">°C</span></label><div class="ctl"><input type="number" id="f-peak" step="5"></div></div>
           <div class="field w6"><label for="f-atm">Atmosphere</label><div class="ctl"><select id="f-atm"></select></div></div>
           <div class="field w6"><label for="f-cool">Cooling</label><div class="ctl"><select id="f-cool">
-            <option value="fast">Fast — crash cool</option>
-            <option value="normal">Normal — kiln off</option>
-            <option value="slow">Slow — controlled</option>
-            <option value="vslow">Very slow — 12 h+</option>
+            <option value="fast">Fast (crash cool)</option>
+            <option value="normal">Normal (kiln off)</option>
+            <option value="slow">Slow (controlled)</option>
+            <option value="vslow">Very slow (12 h+)</option>
           </select></div></div>
           <div class="field w2"><label for="f-holdc">Hold <span class="unit">°C</span></label><div class="ctl"><input type="number" id="f-holdc" step="10"></div></div>
           <div class="field w2"><label for="f-holdm">Hold <span class="unit">min</span></label><div class="ctl"><input type="number" id="f-holdm" step="5"></div></div>
           <div class="field w2"><label for="f-soak">Soak <span class="unit">min</span></label><div class="ctl"><input type="number" id="f-soak" step="5"></div></div>
         </div>
-        <p class="note">The hold is where crystal growth happens. Drop it 80 °C and the same glaze frosts over; raise it and you get gloss.</p>
+        <p class="note">Crystals grow during the hold. Drop the hold 80 °C and the same glaze frosts over. Raise it and the glaze stays glossy.</p>
       </section>
     </aside>
   </div>
@@ -483,12 +483,12 @@
   <footer class="colophon">
     <div class="sec-label label"><span class="no">—</span>Method</div>
     <p>
-      Recipes are reduced to oxide moles and a unity formula; multivalent cations are speciated against an atmosphere
-      ladder; each candidate phase gets a saturation ratio, a liquidus depression and a time–temperature–transformation
-      curve; the kiln schedule is integrated against those curves; crystals and dopants feed a Fresnel / ligand-field
-      colour model. Structures and habits are real crystallography. The kinetic constants are <b>calibrated</b>, not
-      first-principles: treat absolute times as ±half a decade, and read the ranking, the mechanisms and the levers as
-      the output.
+      Recipes are reduced to oxide moles and a unity formula. Multivalent cations are speciated against an atmosphere
+      ladder. Each candidate phase gets a saturation ratio, a liquidus depression and a time–temperature–transformation
+      curve, and the kiln schedule is integrated against those curves. Crystals and dopants feed a Fresnel / ligand-field
+      colour model. Structures and habits are real crystallography. The kinetic constants are calibrated against known
+      glazes, not derived from first principles. Absolute times are good to ±half a decade. The ranking, the mechanisms
+      and the levers are the reliable output.
     </p>
   </footer>
 </div>
@@ -1259,7 +1259,7 @@ GC.color = {
 
 </script>
 <script>
-/* GLAZECAST — the engine.
+/* GLAZECAST engine.
  *
  * chain:  recipe -> oxide moles -> unity formula
  *         atmosphere -> redox speciation (which oxidation states exist)
@@ -1267,12 +1267,12 @@ GC.color = {
  *         kiln schedule -> time-temperature path -> TTT intersection -> volume fraction
  *         crystals + dopants -> optics -> appearance
  *
- * Honesty note: the *thermodynamic* skeleton (which oxides, which structures,
+ * Calibration: the thermodynamic skeleton (which oxides, which structures,
  * which redox couples, liquidus depression, driving force) is standard.
- * The absolute kinetic constants are calibrated against known glaze outcomes,
- * because real nucleation rates in a glaze depend on the body, the interface
- * and the kiln in ways no desktop model resolves. Treat times as +/- half a
- * decade and rankings as the real output.
+ * The absolute kinetic constants are calibrated against known glaze outcomes.
+ * Real nucleation rates in a glaze depend on the body, the interface and the
+ * kiln, and no desktop model resolves those. Times are good to +/- half a
+ * decade; the rankings are the output to rely on.
  */
 (function (root) {
 'use strict';
@@ -2015,8 +2015,8 @@ GC.PRESETS.forEach(function (p) { GC.PRESET_BY_ID[p.id] = p; });
 
 </script>
 <script>
-/* GLAZECAST — drawing: the simulated surface and the TTT diagram.
- * Everything here is driven by the engine's numbers, not by canned art.
+/* GLAZECAST drawing: the simulated surface and the TTT diagram.
+ * Driven by the engine's numbers. There is no pre-drawn artwork.
  */
 (function (root) {
 'use strict';
@@ -2569,7 +2569,7 @@ function ttt(canvas, pred) {
   ctx.textAlign = 'right';
   ctx.font = '10.5px ' + MONO;
   ctx.fillStyle = IRON;
-  ctx.fillText('← left of a curve: crystallises', x1 - 4, y0 + 12);
+  ctx.fillText('→ right of a curve: crystallises', x1 - 4, y0 + 12);
   ctx.textAlign = 'left';
 }
 
@@ -2892,13 +2892,13 @@ function renderCrystals(pred) {
   $('pane-crystals').innerHTML =
     '<div class="split"><div>' +
     '<h3>Ranked phases</h3>' +
-    (rows ? '<div class="rank">' + rows + '</div>' : '<p class="hint">Nothing above threshold. The melt is undersaturated in every phase in the database.</p>') +
+    (rows ? '<div class="rank">' + rows + '</div>' : '<p class="hint">No phase is above threshold. The melt is undersaturated in every phase in the database.</p>') +
     '</div><div>' +
     '<h3>Redox ladder</h3>' +
     '<div class="ladder">' + ladder + '</div>' +
-    '<p class="hint" style="margin-top:16px">Each bar is the fraction of that element in its reduced state at your atmosphere (R = ' +
-    pred.spec.strength.toFixed(2) + '); the tick marks half. The ladder is why bismuth goes metallic in a reduction kiln and does nothing in oxidation: ' +
-    'its couple sits above iron, so the same CO that reduces Fe3+ has already reduced Bi3+.</p>' +
+    '<p class="hint" style="margin-top:16px">Each bar is the fraction of that element in its reduced state at this atmosphere (R = ' +
+    pred.spec.strength.toFixed(2) + '). The tick marks half. Bismuth sits above iron on this ladder, so the CO that reduces Fe3+ has already reduced Bi3+. ' +
+    'That is why bismuth goes metallic in a reduction kiln and forms nothing in oxidation.</p>' +
     '</div></div>';
 }
 
@@ -2927,8 +2927,7 @@ function renderKinetics(pred) {
     '<span><i style="background:#938a7e"></i>competitors</span>' +
     '<span><i class="dash"></i>your kiln path</span>' +
     '<span class="aside">log time × temperature</span></div>' +
-    '<p class="hint" style="margin-top:18px">A phase only appears if your cooling path passes to the <b>left</b> of its curve — ' +
-    'inside the time it needs at that temperature. C-shaped curves are the signature of nucleation theory: too hot and the driving force is tiny, too cold and diffusion stops.</p>' +
+    '<p class="hint" style="margin-top:18px">A phase appears only where the cooling path has spent more time at a temperature than the curve requires. On this chart that is to the right of the curve. The curves are C-shaped because of nucleation theory. Too hot and the driving force is tiny. Too cold and diffusion stops.</p>' +
     '</div><div>' +
     '<h3>Your schedule</h3>' +
     '<dl class="desc">' + desc.map(function (d) { return '<div><dt>' + d[0] + '</dt><dd>' + u(d[1]) + '</dd></div>'; }).join('') + '</dl>' +
@@ -2940,21 +2939,21 @@ function kineticsNote(pred) {
   var vis = pred.ranked.filter(function (r) { return r.visible; });
   var top = vis[0];
   if (top && top.phase.kind === 'metal') {
-    return 'Metals are not a nucleation problem. ' + top.phase.name + ' is already a separate liquid at your peak temperature, so it simply freezes at ' +
-      temp(top.phase.Tm - 273) + ' on the way down. What matters is how much of the metal was reduced and how slowly you passed the freezing point: slower cooling gives fewer, larger, better-formed hopper plates.';
+    return top.phase.name + ' does not need to nucleate. It is already a separate liquid at your peak temperature and freezes at ' +
+      temp(top.phase.Tm - 273) + ' on the way down. The result depends on how much of the metal was reduced and how slowly the kiln passed the freezing point. Slower cooling gives fewer, larger, better-formed hopper plates.';
   }
   if (!top) {
     var best = pred.ranked[0];
-    if (!best) return 'No phase even reaches its saturation threshold, so temperature and time cannot help. Change the chemistry.';
-    return 'The closest phase is ' + best.phase.name + ' at ' + pct(best.sat) + ' of its threshold — it never becomes supersaturated, so no hold will make it appear. That is a chemistry problem, not a firing problem.';
+    if (!best) return 'No phase reaches its saturation threshold, so no change of temperature or time will help. The chemistry has to change.';
+    return 'The closest phase is ' + best.phase.name + ' at ' + pct(best.sat) + ' of its threshold. It never becomes supersaturated, so no hold will make it appear. Only a change in chemistry will.';
   }
   var t = top.tBest, T = top.Tbest ? top.Tbest - 273 : null;
   var held = pred.sched.holdS / 60;
   var parts = [];
-  parts.push(top.phase.name + ' needs about <b>' + dur(t) + '</b> at ' + temp(T) + ' to reach a visible crystal size.');
-  if (held > 0) parts.push('You hold for ' + held + ' min at ' + temp(pred.sched.holdC) + ', so the growth window is ' + (held * 60 > t ? 'comfortably open' : 'marginal') + '.');
-  parts.push(dur(top.tBelow) + ' of the schedule sits below the liquidus of ' + temp(top.TmEff - 273) + '.');
-  if (top.seeded) parts.push('It never fully dissolves at your peak, so undissolved grains are acting as seeds — that is why it starts so readily.');
+  parts.push(top.phase.name + ' needs about ' + dur(t) + ' at ' + temp(T) + ' to reach a visible crystal size.');
+  if (held > 0) parts.push('The hold is ' + held + ' min at ' + temp(pred.sched.holdC) + ', so the growth window is ' + (held * 60 > t ? 'wide' : 'marginal') + '.');
+  parts.push(dur(top.tBelow) + ' of the schedule is spent below its liquidus of ' + temp(top.TmEff - 273) + '.');
+  if (top.seeded) parts.push('It does not fully dissolve at your peak, so undissolved grains act as seeds. That is why it starts so readily.');
   return parts.join(' ');
 }
 
@@ -2989,7 +2988,7 @@ function renderChemistry(pred) {
     ? pred.warnings.map(function (w) {
       return '<div class="warn ' + w.level + '">' + esc(w.text) + '</div>';
     }).join('')
-    : '<div class="warn info">Nothing structural to flag: expansion is compatible, no heavy-metal loading, no runaway flux.</div>';
+    : '<div class="warn info">No flags. Expansion is compatible, there is no heavy-metal loading and no runaway flux.</div>';
 
   $('pane-chemistry').innerHTML =
     '<h3>Melt descriptors</h3>' +
@@ -3007,9 +3006,9 @@ function saturationTable(pred) {
     return '<tr><td class="k">' + esc(r.phase.name) + '</td><td class="num">' + r.sat.toFixed(2) + '×</td>' +
       '<td class="num" style="color:' + (ok ? '#76a99b' : '#c9735e') + '">' + (ok ? 'super' : 'under') + '</td></tr>';
   }).join('');
-  if (!rows) return '<p class="hint">No phase came within reach of its threshold.</p>';
+  if (!rows) return '<p class="hint">No phase comes close to its threshold.</p>';
   return '<table><thead><tr><th>phase</th><th class="num">sat</th><th class="num">state</th></tr></thead><tbody>' + rows +
-    '</tbody></table><p class="hint">1.00× is the composition where the phase first appears. Above 1 the melt is supersaturated and can precipitate it; below 1 nothing you do to the firing will help.</p>';
+    '</tbody></table><p class="hint">1.00× is the composition where the phase first appears. Above 1 the melt is supersaturated and can precipitate it. Below 1, no change to the firing will produce it.</p>';
 }
 
 /* ---------------- levers pane -------------------------------------------- */
@@ -3026,11 +3025,11 @@ function renderLevers(pred) {
 
   $('pane-levers').innerHTML =
     '<div class="split"><div>' +
-    '<h3>What actually changes the answer</h3>' + rows +
+    '<h3>Single changes and their effect</h3>' + rows +
     '</div><div>' +
-    '<h3>Reading this</h3>' +
-    '<p class="hint" style="margin-top:16px">Each row is a real re-run of the chemistry through the same model: flip the atmosphere, slow the cooling, extend the hold, push the cone. ' +
-    'A marked row means the dominant phase changes outright — those are the levers worth pulling. The rest just make the same crystal bigger or smaller.</p>' +
+    '<h3>How to read the rows</h3>' +
+    '<p class="hint" style="margin-top:16px">Each row re-runs the same chemistry through the same model with one change: flip the atmosphere, slow the cooling, extend the hold, push the cone. ' +
+    'A marked row means the dominant phase changes. The other rows only make the same crystal bigger or smaller.</p>' +
     '<p class="key"><i></i>dominant phase changes</p>' +
     '</div></div>';
 }

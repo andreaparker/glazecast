@@ -1,5 +1,5 @@
-/* GLAZECAST — drawing: the simulated surface and the TTT diagram.
- * Everything here is driven by the engine's numbers, not by canned art.
+/* GLAZECAST drawing: the simulated surface and the TTT diagram.
+ * Driven by the engine's numbers. There is no pre-drawn artwork.
  */
 (function (root) {
 'use strict';
@@ -552,7 +552,7 @@ function ttt(canvas, pred) {
   ctx.textAlign = 'right';
   ctx.font = '10.5px ' + MONO;
   ctx.fillStyle = IRON;
-  ctx.fillText('← left of a curve: crystallises', x1 - 4, y0 + 12);
+  ctx.fillText('→ right of a curve: crystallises', x1 - 4, y0 + 12);
   ctx.textAlign = 'left';
 }
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GLAZECAST — predict the crystal</title>
+<title>GLAZECAST: predict the crystal</title>
 <style>
   :root{
     /* ground: kiln brick gone cold; ink: bone ash; accent: the kiln at 1000 °C */
@@ -385,7 +385,7 @@
       <svg viewBox="0 0 17 30" aria-hidden="true"><path d="M3.2 29.5 L6.6 9.2 Q7.6 3.4 13.6 1.6 Q9.8 5.6 10.1 11 L13.8 29.5 Z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M1 29.5 H16" stroke="#d98a3d" stroke-width="1"/></svg>
       <span class="wordmark">Glazecast</span>
     </div>
-    <p class="proposition">Enter a glaze recipe and its firing; read the crystal it will grow, with its system, habit, size and colour.</p>
+    <p class="proposition">Enter a glaze recipe and its firing to get the predicted crystal: its system, habit, size and colour.</p>
     <p class="status label"><a href="structures.html" style="color:inherit;border-bottom:1px solid rgba(217,138,61,.4);text-decoration:none">The unit cells ↗</a> &nbsp;·&nbsp; <span class="live"></span>Live · every edit recomputes</p>
   </header>
 
@@ -449,16 +449,16 @@
           <div class="field"><label for="f-peak">Peak <span class="unit">°C</span></label><div class="ctl"><input type="number" id="f-peak" step="5"></div></div>
           <div class="field w6"><label for="f-atm">Atmosphere</label><div class="ctl"><select id="f-atm"></select></div></div>
           <div class="field w6"><label for="f-cool">Cooling</label><div class="ctl"><select id="f-cool">
-            <option value="fast">Fast — crash cool</option>
-            <option value="normal">Normal — kiln off</option>
-            <option value="slow">Slow — controlled</option>
-            <option value="vslow">Very slow — 12 h+</option>
+            <option value="fast">Fast (crash cool)</option>
+            <option value="normal">Normal (kiln off)</option>
+            <option value="slow">Slow (controlled)</option>
+            <option value="vslow">Very slow (12 h+)</option>
           </select></div></div>
           <div class="field w2"><label for="f-holdc">Hold <span class="unit">°C</span></label><div class="ctl"><input type="number" id="f-holdc" step="10"></div></div>
           <div class="field w2"><label for="f-holdm">Hold <span class="unit">min</span></label><div class="ctl"><input type="number" id="f-holdm" step="5"></div></div>
           <div class="field w2"><label for="f-soak">Soak <span class="unit">min</span></label><div class="ctl"><input type="number" id="f-soak" step="5"></div></div>
         </div>
-        <p class="note">The hold is where crystal growth happens. Drop it 80 °C and the same glaze frosts over; raise it and you get gloss.</p>
+        <p class="note">Crystals grow during the hold. Drop the hold 80 °C and the same glaze frosts over. Raise it and the glaze stays glossy.</p>
       </section>
     </aside>
   </div>
@@ -483,12 +483,12 @@
   <footer class="colophon">
     <div class="sec-label label"><span class="no">—</span>Method</div>
     <p>
-      Recipes are reduced to oxide moles and a unity formula; multivalent cations are speciated against an atmosphere
-      ladder; each candidate phase gets a saturation ratio, a liquidus depression and a time–temperature–transformation
-      curve; the kiln schedule is integrated against those curves; crystals and dopants feed a Fresnel / ligand-field
-      colour model. Structures and habits are real crystallography. The kinetic constants are <b>calibrated</b>, not
-      first-principles: treat absolute times as ±half a decade, and read the ranking, the mechanisms and the levers as
-      the output.
+      Recipes are reduced to oxide moles and a unity formula. Multivalent cations are speciated against an atmosphere
+      ladder. Each candidate phase gets a saturation ratio, a liquidus depression and a time–temperature–transformation
+      curve, and the kiln schedule is integrated against those curves. Crystals and dopants feed a Fresnel / ligand-field
+      colour model. Structures and habits are real crystallography. The kinetic constants are calibrated against known
+      glazes, not derived from first principles. Absolute times are good to ±half a decade. The ranking, the mechanisms
+      and the levers are the reliable output.
     </p>
   </footer>
 </div>

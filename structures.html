@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GLAZECAST — crystal structures</title>
+<title>GLAZECAST: crystal structures</title>
 <style>
   :root{
     --ground:#0c0b0a; --panel:#141210; --line:#2a251f;
@@ -69,20 +69,20 @@
     <nav><a href="./">← the tool</a><a href="./#bi-red">bismuth</a></nav>
   </header>
 
-  <h1>The unit cells, from the database.</h1>
-  <p class="lede">Every structure below is built from an experimental CIF in the Crystallography Open
-    Database — lattice parameters, space group and atom positions as published, not as recalled.</p>
-  <p class="note">Every cell passes two checks before it appears here: the element ratio must match the mineral
-    formula, and every bonded pair must land inside a literature bond-length window (Fe–O 1.85–2.20 Å, Si–O
-    1.55–1.72 Å, and so on). The number at the bottom of each card is the measured shortest bond for that pair.
-    Click through to the COD entry to compare against the original data.</p>
+  <h1>Unit cells</h1>
+  <p class="lede">Each structure below is built from an experimental CIF in the Crystallography Open
+    Database, with lattice parameters, space group and atom positions as published.</p>
+  <p class="note">Each cell passed two checks: the element ratio matches the mineral formula, and every bonded
+    pair falls inside a literature bond-length window (Fe–O 1.85–2.20 Å, Si–O 1.55–1.72 Å, and so on). The
+    number at the bottom of each card is the measured shortest bond for that pair. The link beside it opens the
+    COD entry with the original data.</p>
   <div class="badge"><i></i>18 cells · 18/18 passed the distance check</div>
 
   <div class="grid" id="grid"></div>
 
   <footer>
-    These cells are what the predictor's phase names, systems and space groups refer to. Phases without a
-    validated cell are not shown here.
+    The phase names, systems and space groups in the predictor refer to these cells. Phases without a
+    validated cell are not shown.
     <br><br>
     Data: <a href="https://www.crystallography.net/cod/">Crystallography Open Database</a> (public domain).
     Read and symmetry-expanded with <a href="https://ase-lib.org/">ASE</a>. Drag any cell to rotate it.
@@ -107,7 +107,7 @@
         '<h2>' + s.name + '</h2>' +
         '<div class="formula">' + s.formula + '</div>' +
         '<dl>' +
-          '<dt>system</dt><dd>' + (s.spaceGroup || '—') + (s.spaceGroupNumber ? ' · #' + s.spaceGroupNumber : '') + '</dd>' +
+          '<dt>space group</dt><dd>' + (s.spaceGroup || '—') + (s.spaceGroupNumber ? ' · #' + s.spaceGroupNumber : '') + '</dd>' +
           '<dt>a / b / c</dt><dd>' + cell.a.toFixed(3) + ' · ' + cell.b.toFixed(3) + ' · ' + cell.c.toFixed(3) + ' Å</dd>' +
           '<dt>α / β / γ</dt><dd>' + cell.alpha.toFixed(1) + ' · ' + cell.beta.toFixed(1) + ' · ' + cell.gamma.toFixed(1) + '°</dd>' +
           '<dt>atoms in cell</dt><dd>' + s.atoms.length + '</dd>' +

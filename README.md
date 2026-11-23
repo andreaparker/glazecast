@@ -1,11 +1,8 @@
 # GLAZECAST
 
-Glaze chemistry in. Crystal structure out.
-
-A predictive tool for the part of ceramics that gets treated as mystery: what actually grows on the
-surface. Give it a recipe, an atmosphere, a cone and a cooling curve. It returns the crystalline
-phase, its crystal system and space group, its habit and size, the colour, a simulated surface, and
-the chain of reasoning that produced each one.
+GLAZECAST predicts which crystalline phase grows on a fired glaze. Input a recipe, an atmosphere, a
+cone and a cooling curve. Output: the phase, its crystal system and space group, its habit and size,
+the colour, a simulated surface, and the steps that led to each result.
 
 ```
 recipe ──► oxide moles ──► unity formula ──┬──► melt structure (NBO/T, optical basicity)
@@ -22,7 +19,7 @@ crystals + dopants ────────────────────�
 | | |
 |---|---|
 | App | open `index.html`. No server, no build, no dependencies. |
-| Single file | `dist/glazecast.html`. Everything inlined, send it to anyone. |
+| Single file | `dist/glazecast.html`. Everything inlined into one file. |
 | Tests | `node tests/run.mjs`. 39 assertions against known glaze outcomes. |
 | CLI | `node cli.mjs bi-red`, `node cli.mjs --json tenmoku`, `node cli.mjs --file myglaze.json` |
 | Rebuild | `node build.mjs` inlines the modules into `dist/glazecast.html`. |
@@ -37,38 +34,38 @@ crystals + dopants ────────────────────�
 
 Material ids are listed in `src/00-core.js` (`GC.MATERIALS`).
 
-## The case in the video
+## Worked example: the bismuth glaze from the video
 
 A cone-6 glaze with a few percent bismuth trioxide, fired in reduction, comes out with silver
-triangular crystals on a pink-and-blue iridescent ground. Each step is forced:
+triangular crystals on a pink-and-blue iridescent ground. The prediction follows from four steps.
 
 1. Redox. `Bi³⁺ + 3e⁻ → Bi⁰`, E° = +0.31 V. On the reducibility ladder bismuth sits above iron,
    so the CO that only partly reduces Fe³⁺ has already taken bismuth most of the way to metal.
-   At R = 0.58 the tool puts 92 % of the bismuth on the metal side. In clean air it puts 7 %,
-   below the threshold, and predicts nothing. That matches what people who have
+   At R = 0.58 the model puts 92 % of the bismuth on the metal side. In clean air it puts 7 %,
+   below the threshold, and predicts no bismuth phase. People who have
    [tested bismuth at cone 6 in oxidation](https://krill-crocodile-h3a7.squarespace.com/blog/playing-with-bismuth-in-cone-6-part-2-my-apology-to-bismuth)
-   report: no crystals, a faint purple sheen, a stiffer glaze.
-2. Immiscibility. Liquid bismuth does not dissolve in a silicate melt. It beads. That is why you
-   get discrete crystals instead of a dissolved colour.
+   report the same: no crystals, a faint purple sheen, a stiffer glaze.
+2. Immiscibility. Liquid bismuth does not dissolve in a silicate melt. It separates into droplets,
+   so the result is discrete crystals instead of a dissolved colour.
 3. Lattice. Bismuth is rhombohedral A7 (R-3m, a = 4.546 Å, α = 57.24°), trigonal in habit:
    triangular plates, spiral growth steps, skeletal re-entrant edges. It freezes at 271 °C, long
    after the glaze has stiffened, so each droplet keeps the shape it grew in.
-4. Optics. The metal is silver. The colour is not in the metal at all: a 40–200 nm skin of Bi₂O₃
-   grows on it as it cools and thin-film interference does the rest. The tool computes the Fresnel
-   reflectance of that film at every wavelength and integrates it against the CIE observer. Blue,
-   pink, gold and teal are one chemistry at different film thicknesses.
+4. Optics. The metal itself is silver. The colour comes from a 40–200 nm film of Bi₂O₃ that grows
+   on the metal as it cools, by thin-film interference. The model computes the Fresnel reflectance
+   of that film at every wavelength and integrates it against the CIE observer. Blue, pink, gold
+   and teal are the same chemistry at different film thicknesses.
 
-The historical literature agrees: metallic bismuth deposits on glazes were a known reduction effect
-in the [1909 *Keramic Studio*](https://ia600501.us.archive.org/23/items/keramicstud1019081909leon/keramicstud1019081909leon.pdf)
-("salts of silver, copper and bismuth … under the action of carbon monoxide and hydrocarbons"),
-and Bi₂O₃ is now the standard
+Metallic bismuth deposits on glazes were a known reduction effect by the
+[1909 *Keramic Studio*](https://ia600501.us.archive.org/23/items/keramicstud1019081909leon/keramicstud1019081909leon.pdf)
+("salts of silver, copper and bismuth … under the action of carbon monoxide and hydrocarbons").
+Bi₂O₃ is now the standard
 [lead replacement in borosilicate glazes](https://hal.science/hal-05048865v1/preview/Article%20Ceramics%20International%202025.pdf)
 because Bi³⁺ and Pb²⁺ are isoelectronic lone-pair ions.
 
-The app ships both firings as presets, Bismuth reduced and Bismuth oxidised, so you can watch the
-prediction flip on the atmosphere alone.
+Both firings ship as presets, Bismuth reduced and Bismuth oxidised. They differ only in atmosphere,
+and the prediction flips between them.
 
-## What is actually computed
+## What is computed
 
 | Step | Method | Status |
 |---|---|---|
@@ -83,21 +80,20 @@ prediction flip on the atmosphere alone.
 | Colour | ligand-field absorption bands, Beer–Lambert, van de Hulst scattering, Fresnel thin film, CIE 1931 → sRGB | optics exact, band strengths calibrated |
 | Surface | render driven by the predicted phase, size, load and colour | illustration |
 
-The chemistry is standard and exact where it can be: stoichiometry, redox order, crystal
-structures, interference and colour science come from databases and textbook physics. The kinetics
-are calibrated. Nucleation rates depend on the clay body, the interface and the kiln in ways no
-desktop model resolves, so absolute times are rough; treat them as ±half a decade. The rankings,
-the mechanisms and the levers are the reliable part.
+Stoichiometry, redox order, crystal structures, interference and colour science come from
+databases and textbook physics. The kinetics are calibrated. Nucleation rates depend on the clay
+body, the interface and the kiln, and no desktop model resolves those, so absolute times are good
+to ±half a decade. The rankings, mechanisms and levers are more reliable than the times.
 
-Not modelled: real activity coefficients (FactSage/Thermo-Calc territory), interfacial energies,
-nucleation density on a real body, glaze thickness variation, kiln atmosphere drift, and
+Not modelled: real activity coefficients (these need FactSage or Thermo-Calc), interfacial
+energies, nucleation density on a real body, glaze thickness variation, kiln atmosphere drift, and
 body–glaze interaction beyond a linear-expansion warning.
 
 ## The levers tab
 
-Each row is a real re-run of the whole pipeline: flip the atmosphere, slow the cooling, extend the
-hold, push a cone. The tab reports which change replaces the dominant phase and which only make
-the same crystal bigger. For the bismuth glaze, the atmosphere row is the only one that flips it.
+Each row re-runs the whole pipeline with one change: flip the atmosphere, slow the cooling, extend
+the hold, push a cone. The tab shows which changes replace the dominant phase and which only make
+the same crystal bigger. For the bismuth glaze, only the atmosphere row changes the phase.
 
 ## Validation
 
@@ -125,7 +121,7 @@ src/00-core.js        cones, oxide properties, 50+ raw materials with analyses, 
 src/10-phases.js      34 crystalline phases: formula, structure, habit, thermochemistry, notes
 src/20-color.js       CIE observer, absorption bands, scattering, thin-film Fresnel
 src/30-engine.js      composition → redox → saturation → TTT → optics
-src/40-presets.js     eight known outcomes
+src/40-presets.js     eight presets with known outcomes
 src/50-render.js      simulated surface + TTT chart
 src/60-ui.js          interface
 src/70-crystal.js     unit-cell renderer (real COD structures)
@@ -134,16 +130,14 @@ cli.mjs               command line
 build.mjs             single-file bundler
 ```
 
-## Where it stops being a model
+## Next steps
 
-1. Replace `CRIT` with a real thermodynamic database. Every phase carries a calibrated threshold
-   composition. Swap it for activities from a slag/glass database (FactSage, Thermo-Calc, MELTS)
-   and the saturation ratio becomes a Gibbs-energy driving force instead of a calibrated proxy.
+1. Replace `CRIT` with a real thermodynamic database. Each phase now carries a calibrated threshold
+   composition. With activities from a slag/glass database (FactSage, Thermo-Calc, MELTS), the
+   saturation ratio becomes a Gibbs-energy driving force instead of a calibrated proxy.
 2. Predict habit from structure instead of a habit library. Attachment-energy morphology
    (Bravais–Friedel–Donnay–Harker plus Hartman–Perdok periodic bond chains) derives the crystal
-   shape from the space group. A weekend of surface-slab calculations per phase removes the last
-   lookup table.
-
-And the empirical step: a few thousand Glazy recipes with fired photos. The engine already
-computes the descriptors; fitting the kinetic constants against real outcomes would tighten the
-±half a decade.
+   shape from the space group. It takes about a weekend of surface-slab calculations per phase and
+   removes the last lookup table.
+3. Fit the kinetic constants against a few thousand Glazy recipes with fired photos. The engine
+   already computes the descriptors. The fit would tighten the ±half a decade.

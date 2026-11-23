@@ -1,4 +1,4 @@
-/* GLAZECAST — the engine.
+/* GLAZECAST engine.
  *
  * chain:  recipe -> oxide moles -> unity formula
  *         atmosphere -> redox speciation (which oxidation states exist)
@@ -6,12 +6,12 @@
  *         kiln schedule -> time-temperature path -> TTT intersection -> volume fraction
  *         crystals + dopants -> optics -> appearance
  *
- * Honesty note: the *thermodynamic* skeleton (which oxides, which structures,
+ * Calibration: the thermodynamic skeleton (which oxides, which structures,
  * which redox couples, liquidus depression, driving force) is standard.
- * The absolute kinetic constants are calibrated against known glaze outcomes,
- * because real nucleation rates in a glaze depend on the body, the interface
- * and the kiln in ways no desktop model resolves. Treat times as +/- half a
- * decade and rankings as the real output.
+ * The absolute kinetic constants are calibrated against known glaze outcomes.
+ * Real nucleation rates in a glaze depend on the body, the interface and the
+ * kiln, and no desktop model resolves those. Times are good to +/- half a
+ * decade; the rankings are the output to rely on.
  */
 (function (root) {
 'use strict';
